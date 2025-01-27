@@ -15,12 +15,16 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.bedoabzd.SEEMS"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
+    },
+    "devDependencies": {
+      "@react-native-community/cli": "latest"
     },
     "plugins": [
       "expo-router",
@@ -36,6 +40,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "e3de7f9f-56dc-439e-be14-fc14de082083"
+      }
     }
   }
 }

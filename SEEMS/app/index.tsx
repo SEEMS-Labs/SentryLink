@@ -1,9 +1,15 @@
 import { Text, View, StyleSheet, ImageBackground } from "react-native";
+import Weather from '../Screens/Weather';
+import { StatusBar } from "expo-status-bar";
+import React from 'react';
+
 
 export default function Index() {
   return (
     <View style= {styles.container} >
-      <Text style = {styles.text}>Edit app/index.tsx to edit this screen.</Text>
+      <Weather />
+      
+      <StatusBar style="auto" />
     </View>
   ); 
 }
@@ -11,8 +17,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#25292e" , 
-    justifyContent: "center",
-    alignItems: "center",
   },
   text: {
     color: "#FFF",
