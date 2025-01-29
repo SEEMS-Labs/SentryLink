@@ -1,5 +1,5 @@
 import { Text, View, StyleSheet, ImageBackground } from "react-native";
-import Weather from '../Screens/Weather';
+import Mainpg from '../Screens/Mainpg';
 import { StatusBar } from "expo-status-bar";
 import React from 'react';
 
@@ -7,7 +7,7 @@ import React from 'react';
 export default function Index() {
   return (
     <View style= {styles.container} >
-      <Weather />
+      <Mainpg />
       
       <StatusBar style="auto" />
     </View>
