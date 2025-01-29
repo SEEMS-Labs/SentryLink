@@ -1,55 +1,48 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { database } from "../firebaseConfig";
+import { ref, onValue } from "firebase/database";
 
-const Weather = () => {
-  const [currentTime, setCurrentTime] = useState('');
+export default function Mainpg() {
+  const [sensorData, setSensorData] = useState({
+    airQuality: "",
+    humidity: "",
+    pressure: "",
+    temperature: "",
+  });
 
   useEffect(() => {
-    // Function to update the time
-    const updateTime = () => {
-      const now = new Date();
-      setCurrentTime(now.toLocaleTimeString()); // Formats time as hh:mm:ss AM/PM
-    };
+    const sensorRef = ref(database, "readings"); // Reference to "readings" in the database
 
-    // Update time every second
-    const timer = setInterval(updateTime, 1000);
-
-    // Cleanup interval on component unmount
-    return () => clearInterval(timer);
+    onValue(sensorRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setSensorData(snapshot.val()); // Update state with fetched data
+      } else {
+        console.log("No data available");
+      }
+    });
   }, []);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Weather</Text>
-      <Text style={styles.time}>{currentTime}</Text>
-      <Text style={styles.info}>It's sunny today, 25°C</Text>
+      <Text style={styles.text}>Air Quality: {sensorData.airQuality}</Text>
+      <Text style={styles.text}>Humidity: {sensorData.humidity}</Text>
+      <Text style={styles.text}>Pressure: {sensorData.pressure}</Text>
+      <Text style={styles.text}>Temperature: {sensorData.temperature}</Text>
     </View>
   );
-};
-
-export default Weather;
+}
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: '#3b3b3b',
-    borderRadius: 10,
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#25292e",
   },
-  header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 10,
-  },
-  time: {
-    fontSize: 20,
-    color: '#ffcc00',
-    marginBottom: 10,
-  },
-  info: {
-    fontSize: 16,
-    color: '#ccc',
+  text: {
+    color: "#FFF",
+    fontSize: 18,
+    marginVertical: 5,
   },
 });
