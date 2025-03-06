@@ -46,10 +46,10 @@ export default function Mainpg() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
     alignItems: "center",
     backgroundColor: "#25292e",
-    paddingTop: "10%",
+    paddingTop: "5%",
     width: "100%",
   },
   text: {
@@ -57,6 +57,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     marginVertical: 12,
     alignSelf: "flex-start", // Align text to the left
-    paddingLeft: 15, // Adjust the left spacing as needed
+    paddingLeft: 25, // Adjust the left spacing as needed
   },
 });

@@ -9,7 +9,7 @@ export default function Index() {
   return (
     <View style={styles.container}>
       {/* Mainpg will handle displaying sensor data */}
-      <Cam />
+      <Mainpg />
       <StatusBar style="auto" />
     </View>
   );
