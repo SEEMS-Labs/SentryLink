@@ -30,7 +30,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
-         <Stack.Screen name="index" options={{ title: 'Home' }} />
+         <Stack.Screen name="index" options={{ title: 'SEEMS SentryLink' }} />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />

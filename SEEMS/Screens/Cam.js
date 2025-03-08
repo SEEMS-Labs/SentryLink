@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Button, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 const CamScreen = () => {
@@ -12,26 +12,53 @@ const CamScreen = () => {
     if (isStreaming) {
       setUri(''); // Stop the stream by clearing the URI
     } else {
-      setUri('http://192.168.1.149/'); // Start the stream by setting the URI
+      setUri('http://192.168.135.13'); // Start the stream by setting the URI
     }
     setIsStreaming(!isStreaming); // Toggle the state
   };
 
   return (
     <View style={{ flex: 1 }}>
-      <Button
-        title={isStreaming ? 'Stop Stream' : 'Start Stream'}
-        onPress={toggleStream}
-      />
       {/* Only show WebView when the stream is active */}
       {isStreaming && (
-        <WebView
-          source={{ uri: uri }}
-          style={{ flex: 1 }}
-        />
+        <View style={{ flex: 1 }}>
+          <WebView
+            source={{ uri: uri }}
+            style={{ flex: 1 }}
+          />
+        </View>
       )}
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <TouchableOpacity
+          style={[styles.button, isStreaming ? styles.stopButton : styles.startButton]}
+          onPress={toggleStream}
+        >
+          <Text style={styles.buttonText}>
+            {isStreaming ? 'Stop Stream' : 'Start Stream'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  button: {
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    margin: 10,
+  },
+  startButton: {
+    backgroundColor: 'red',
+  },
+  stopButton: {
+    backgroundColor: 'black',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+  },
+});
 
 export default CamScreen;

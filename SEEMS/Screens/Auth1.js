@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, TextInput, Button, StyleSheet, Text } from "react-native";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../firebaseConfig"; // Import auth
+import { auth } from "../Firebase/firebaseConfig"; // Import auth
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState("");
@@ -11,7 +11,7 @@ export default function LoginScreen({ navigation }) {
   const handleLogin = async () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigation.navigate("Home"); // Navigate to main screen after login
+      navigation.navigate("Mainpg"); // Navigate to main screen after login
     } catch (err) {
       setError("Failed to login. Please check your credentials.");
     }
@@ -20,7 +20,7 @@ export default function LoginScreen({ navigation }) {
   const handleSignUp = async () => {
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-      navigation.navigate("WiFiSetup"); // If new user, navigate to Wi-Fi setup
+      navigation.navigate("Mainpg"); // If new user, navigate to Wi-Fi setup
     } catch (err) {
       setError("Error signing up.");
     }
