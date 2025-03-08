@@ -27,6 +27,7 @@ export default function Mainpg() {
           pressure: data.pressure ? Math.round(Number(data.pressure)) : 0,
           temperature: data.temperature ? Math.round(Number(data.temperature)) : 0,
           noise: data.noise ? Math.round(Number(data.noise)) : 0,
+          distance: data.distance ? Math.round(Number(data.distance)) : 0,
         };
 
         setSensorData(roundedData); // Update state with rounded data
@@ -45,6 +46,7 @@ export default function Mainpg() {
       <Text style={styles.text}>Air Quality: {"   "}<Text style={{ color: 'green' }}>{sensorData.airQuality} AQI</Text></Text>
       <Text style={styles.text}>Pressure: {" "}<Text style={{ color: 'purple' }}>{sensorData.pressure} hPa</Text></Text>
       <Text style={styles.text}>Noise Level: {"  "}<Text style={{ color: 'orange' }}>{sensorData.noise} dB</Text></Text>
+      <Text style={styles.text}>Distance: {"  "}<Text style={{ color: 'cyan' }}>{sensorData.distance} dB</Text></Text>
     </View>
     </View>
   );
