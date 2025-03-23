@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, Button, StyleSheet } from "react-native";
 import { database } from "../Firebase/firebaseConfig";
-import { ref, onValue } from "firebase/database";
+import { ref, onValue, off  } from "firebase/database";
 
 export default function HomeScreen() {
   const [sensorData, setSensorData] = useState({
@@ -12,9 +12,9 @@ export default function HomeScreen() {
   });
 
   useEffect(() => {
-    const sensorRef = ref(database, "readings");
+    const sensorRef = ref(database, "sentry/readings");
 
-    onValue(sensorRef, (snapshot) => {
+    const unsubscribe = onValue(sensorRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         
@@ -33,6 +33,7 @@ export default function HomeScreen() {
         console.log("No data available");
       }
     });
+    return () => off(sensorRef); // Cleanup the listener on unmount
   }, []);
 
   return (

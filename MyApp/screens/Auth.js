@@ -1,28 +1,53 @@
 import React, { useState } from "react";
 import { View, TextInput, Button, StyleSheet, Text } from "react-native";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../Firebase/firebaseConfig"; // Import auth
+import { auth } from "../Firebase/firebaseConfig";
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen({ navigation, setIsLoggedIn }) {
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   const handleLogin = async () => {
+    setError("");
+    if (!email || !password) {
+      setError("Please enter both email and password.");
+      return;
+    }
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigation.navigate("Mainpg"); // Navigate to main screen after login
+      console.log("✅ User logged in:", email);
+      
+      // Set isLoggedIn to true
+      setIsLoggedIn(true); // This will now work
+      navigation.replace("HomeScreen"); 
     } catch (err) {
-      setError("Failed to login. Please check your credentials.");
+      console.error("❌ Login Error:", err.message);
+      setError(err.message);
     }
   };
 
   const handleSignUp = async () => {
+    setError("");
+    if (!email || !password) {
+      setError("Please enter both email and password.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-      navigation.navigate("Mainpg"); // If new user, navigate to Wi-Fi setup
+      console.log("✅ User signed up:", email);
+      
+      setIsLoggedIn(true); // This will now work
+     navigation.replace("HomeScreen");
     } catch (err) {
-      setError("Error signing up.");
+      console.error("❌ Sign-up Error:", err.message);
+      setError(err.message);
     }
   };
 
@@ -31,19 +56,23 @@ export default function LoginScreen({ navigation }) {
       <TextInput
         style={styles.input}
         placeholder="Email"
+        placeholderTextColor="#aaa"
         value={email}
         onChangeText={setEmail}
+        autoCapitalize="none"
+        keyboardType="email-address"
       />
       <TextInput
         style={styles.input}
         placeholder="Password"
+        placeholderTextColor="#aaa"
         secureTextEntry
         value={password}
         onChangeText={setPassword}
       />
       <Button title="Login" onPress={handleLogin} />
       <Button title="Sign Up" onPress={handleSignUp} />
-      {error && <Text>{error}</Text>}
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 }
@@ -62,5 +91,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingLeft: 10,
     color: "#fff",
+  },
+  errorText: {
+    color: "red",
+    marginTop: 10,
   },
 });
