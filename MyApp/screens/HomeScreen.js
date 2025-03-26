@@ -37,6 +37,18 @@ export default function HomeScreen() {
     return () => unsubscribe(); // Cleanup the listener on unmount
   }, []);
 
+  //  const checkThresholds = () => {
+  //   return {
+  //     airQuality: sensorData.airQuality > THRESHOLDS.airQuality,
+  //     humidity: sensorData.humidity > THRESHOLDS.humidity,
+  //     pressure: sensorData.pressure > THRESHOLDS.pressure,
+  //     temperature: sensorData.temperature > THRESHOLDS.temperature,
+  //     noise: sensorData.noise > THRESHOLDS.noise,
+  //   };
+  // };
+
+  // console.log(checkThresholds());
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Readings</Text>

@@ -38,6 +38,7 @@ const LoginScreen = () => {
 
   return (
     <View style={styles.container}>
+      <keyboardAvoidingView behavior="padding">
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -59,6 +60,7 @@ const LoginScreen = () => {
       <Button title="Login" onPress={handleLogin} />
       <Button title="Sign Up" onPress={handleSignUp} />
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      </keyboardAvoidingView>
     </View>
   );
 }

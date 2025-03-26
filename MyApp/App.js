@@ -8,11 +8,12 @@ import { Animated, Alert, TouchableOpacity, StyleSheet, View } from "react-nativ
 import HomeScreen from "./screens/HomeScreen";
 import LoginScreen from "./screens/Auth";
 import CamScreen from "./screens/Cam";
-import WiFiSetupScreen from "./screens/WifiSetup";
+import THRESHOLDS  from "./screens/Customize";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { set } from "firebase/database";
 import { auth } from "./Firebase/firebaseConfig";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+
  
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -25,6 +26,7 @@ function InsideLayout() {
           let iconName;
           if (route.name === "Home") iconName = "home";
           else if (route.name === "Cam") iconName = "camera";
+          else if (route.name === "Custom") iconName = "settings";
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
@@ -33,6 +35,7 @@ function InsideLayout() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Cam" component={CamScreen} />
+      <Tab.Screen name="Custom" component={THRESHOLDS} />
     </Tab.Navigator>
   );
 }
