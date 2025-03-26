@@ -3,53 +3,38 @@ import { View, TextInput, Button, StyleSheet, Text } from "react-native";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../Firebase/firebaseConfig";
 
-export default function LoginScreen({ navigation, setIsLoggedIn }) {
+const LoginScreen = () => {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-
+  const [loading, setLoading] = useState(false);
+  
   const handleLogin = async () => {
-    setError("");
-    if (!email || !password) {
-      setError("Please enter both email and password.");
-      return;
-    }
     try {
+      setLoading(true);
+      setError("");
       await signInWithEmailAndPassword(auth, email, password);
-      console.log("✅ User logged in:", email);
-      
-      // Set isLoggedIn to true
-      setIsLoggedIn(true); // This will now work
-      navigation.replace("HomeScreen"); 
-    } catch (err) {
-      console.error("❌ Login Error:", err.message);
-      setError(err.message);
+      alert("Logged in successfully!");
+    } catch (error) { 
+      setError(error.message);
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
   const handleSignUp = async () => {
-    setError("");
-    if (!email || !password) {
-      setError("Please enter both email and password.");
-      return;
-    }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters long.");
-      return;
-    }
-
     try {
+      setLoading(true);
+      setError("");
       await createUserWithEmailAndPassword(auth, email, password);
-      console.log("✅ User signed up:", email);
-      
-      setIsLoggedIn(true); // This will now work
-     navigation.replace("HomeScreen");
-    } catch (err) {
-      console.error("❌ Sign-up Error:", err.message);
-      setError(err.message);
+      alert("User created successfully!");
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
   return (
     <View style={styles.container}>
@@ -70,12 +55,14 @@ export default function LoginScreen({ navigation, setIsLoggedIn }) {
         value={password}
         onChangeText={setPassword}
       />
+      {loading ? <Text>Loading...</Text> : null}
       <Button title="Login" onPress={handleLogin} />
       <Button title="Sign Up" onPress={handleSignUp} />
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 }
+export default LoginScreen;
 
 const styles = StyleSheet.create({
   container: {
