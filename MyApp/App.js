@@ -35,7 +35,7 @@ function InsideLayout() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Cam" component={CamScreen} />
-      <Tab.Screen name="Custom" component={THRESHOLDS} />
+      {/* <Tab.Screen name="Custom" component={THRESHOLDS} /> */}
     </Tab.Navigator>
   );
 }
