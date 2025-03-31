@@ -7,9 +7,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { set } from "firebase/database";
 import { auth } from "./Firebase/firebaseConfig";
 import { getAuth, signOut } from "firebase/auth";
+import { getDatabase, ref, set } from "firebase/database";
 
 import LoginScreen from "./screens/authen";
 import HomeScreen from "./screens/home";
@@ -93,7 +93,14 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       console.log("User: ", user);
       setUser(user);
-    });
+    const db = getDatabase();
+    const userStatusRef = ref(db, "sentrylink/user_in_app");
+
+    // Update the database element: true if user exists, false otherwise
+    set(userStatusRef, user ? true : false)
+      .then(() => console.log("User in app status updated"))
+      .catch((error) => console.error("Error updating user status:", error));
+  });
 
     return () => unsubscribe(); // Clean up listener
   }, []);
