@@ -136,6 +136,7 @@ export default function HomeScreen() {
           <View style={styles.cardContent}>
             <CircularProgress
               value={sensorData.temperature}
+              minimumValue={0}
               maxValue={(maxTemperature > sensorData.temperature) ? maxTemperature : sensorData.temperature}
               radius={35}
               activeStrokeColor="#FF6347"
@@ -154,6 +155,7 @@ export default function HomeScreen() {
           <View style={styles.cardContent}>
             <CircularProgress
               value={sensorData.humidity}
+              minimumValue={0}
               maxValue={100}
               radius={35}
               activeStrokeColor="#00BFFF"
@@ -169,15 +171,39 @@ export default function HomeScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Pressure</Text>
-          <Text style={styles.cardValue}>
-            {sensorData.pressure} hPa
+          <Text style={styles.cardContent}>
+            <CircularProgress
+              value={sensorData.pressure}
+              minimumValue={300}
+              maxValue={1100}
+              radius={35}
+              activeStrokeColor="#FFD700"
+              inActiveStrokeColor="#E8F0FE"
+              activeStrokeWidth={6}
+              inActiveStrokeWidth={6}
+            />
+            <Text style={styles.cardValue}>
+              {sensorData.pressure} hPa
+            </Text>
           </Text>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Air Quality</Text>
-          <Text style={styles.cardValue}>
-            {sensorData.airQuality} AQI
+          <Text style={styles.cardContent}>
+            <CircularProgress
+              value={sensorData.airQuality}
+              minimumValue={0}
+              maxValue={500}
+              radius={35}
+              activeStrokeColor="#32CD32"
+              inActiveStrokeColor="#E8F0FE"
+              activeStrokeWidth={6}
+              inActiveStrokeWidth={6}
+            />
+            <Text style={styles.cardValue}>
+              {sensorData.airQuality} AQI
+              </Text>
           </Text>
         </View>
       </View>
@@ -192,14 +218,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#25292e",
     width: "100%",
-    paddingTop: "5%",
+    paddingTop: "10%",
     paddingHorizontal: 20,
   },
   header: {
     color: "#e8f0fe",
-    fontSize: 36,
+    fontSize: 28,
     fontWeight: "bold",
-    marginBottom: 20,
+    marginBottom: 15,
   },
   refreshButton: {
     flexDirection: "row",
@@ -217,6 +243,7 @@ const styles = StyleSheet.create({
   },
   dashboard: {
     width: "100%",
+    flex: 1, // Allows it to take up remaining space
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
@@ -224,7 +251,7 @@ const styles = StyleSheet.create({
   card: {
     width: "80%",
     marginBottom: 20,
-    padding: 20,
+    padding: 15,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
