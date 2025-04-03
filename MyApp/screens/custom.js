@@ -88,7 +88,7 @@ const CustomScreen = () => {
     <View style={styles.container}>
       <Text style={styles.header}>Custom Sensor Settings</Text>
 
-      {/* Temperature */}
+      {/* Temperature  convert to F*/}   
       <View style={styles.sensorContainer}>
         <Text style={styles.sensorLabel}>Temperature: {temperature !== null ? temperature + "°C" : "Loading..."}</Text>
         <Text style={styles.sensorLabel}>Threshold: {temperatureThreshold}°C</Text>
@@ -157,7 +157,7 @@ const CustomScreen = () => {
         <Text style={styles.sensorLabel}>Threshold: {airQualityThreshold} AQI</Text>
         <Slider
           style={styles.slider}
-          minimumValue={0}
+          minimumValue={50}
           maximumValue={500}
           value={airQualityThreshold}
           onValueChange={(value) => setAirQualityThreshold(Math.round(value))}
@@ -172,13 +172,13 @@ const CustomScreen = () => {
         />
       </View>
 
-      {/* Noise
+      {/* Noise  Add 24 inches to 156 inches for presens*/}
       <View style={styles.sensorContainer}>
         <Text style={styles.sensorLabel}>Noise: {noise !== null ? noise : "Loading..."}</Text>
         <Text style={styles.sensorLabel}>Threshold: {noiseThreshold}</Text>
         <Slider
           style={styles.slider}
-          minimumValue={0}
+          minimumValue={80}
           maximumValue={120}
           value={noiseThreshold}
           onValueChange={(value) => setNoiseThreshold(Math.round(value))}
@@ -191,7 +191,7 @@ const CustomScreen = () => {
           maximumTrackTintColor="#000000"
           thumbTintColor="#8A2BE2"
         />
-      </View> */}
+      </View> 
 
       {/* Confirm Button */}
       <TouchableOpacity style={styles.confirmButton} onPress={confirmThresholds}>
