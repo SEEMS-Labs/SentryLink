@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Animated, Alert, TouchableOpacity, StyleSheet, View } from "react-native";
+import { Animated, Alert, TouchableOpacity, StyleSheet, View , PermissionsAndroid } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { CurvedBottomBarExpo } from "react-native-curved-bottom-bar";
@@ -7,7 +7,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { auth } from "./Firebase/firebaseConfig";
+import { auth, database } from './Firebase/firebaseConfig';
 import { getAuth, signOut } from "firebase/auth";
 import { getDatabase, ref, set } from "firebase/database";
 
@@ -15,10 +15,25 @@ import LoginScreen from "./screens/authen";
 import HomeScreen from "./screens/home";
 import CameraScreen  from "./screens/Cam";
 import CustomScreen from './screens/custom';
+//import WiFiSetup from "./screens/WiFiSetup";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
+async function requestPermissions() {
+  try {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+    );
+    if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+      console.log("Location permission granted");
+    } else {
+      console.log("Location permission denied");
+    }
+  } catch (err) {
+    console.warn(err);
+  }
+}
 
 function MyTabs() {
   const handleLogout = async () => {
@@ -110,11 +125,15 @@ export default function App() {
       <NavigationContainer>
         <Stack.Navigator initialRouteName="Login">
           {user ? (
-            <Stack.Screen name="Inside" component={MyTabs} options={{ headerShown: false }} />
-          ) : (
-            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-          )}
-        </Stack.Navigator>
+    <>
+      {/* After login, direct the user to WiFiSetup first */}
+       {/* <Stack.Screen name="WiFiSetup" component={WiFiSetup} options={{ headerShown: false }} />  */}
+      <Stack.Screen name="Inside" component={MyTabs} options={{ headerShown: false }} />
+    </>
+  ) : (
+    <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+  )}
+</Stack.Navigator>
       </NavigationContainer>
     </GestureHandlerRootView>
   );

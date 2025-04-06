@@ -172,7 +172,7 @@ const CustomScreen = () => {
         />
       </View>
 
-      {/* Noise  Add 24 inches to 156 inches for presens*/}
+      {/* Noise  Add 24 inches to 156 inches for presense*/}
       <View style={styles.sensorContainer}>
         <Text style={styles.sensorLabel}>Noise: {noise !== null ? noise : "Loading..."}</Text>
         <Text style={styles.sensorLabel}>Threshold: {noiseThreshold}</Text>

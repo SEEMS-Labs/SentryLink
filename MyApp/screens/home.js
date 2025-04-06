@@ -12,6 +12,12 @@ export default function HomeScreen() {
     humidity: "",
     pressure: "",
     temperature: "",
+    ultrasonic: {
+      right: "No presence detected",
+      left: "No presence detected",
+      back: "No presence detected",
+      front: "No presence detected",
+    },
   });
   const [maxTemperature, setMaxTemperature] = useState(100);
 
@@ -20,17 +26,13 @@ export default function HomeScreen() {
     getTempFromStorage();
   }, []);
 
-  // setItemInStorgae('dataItem', dataItem.toString()); this is an example of how to set an item in storage
-
-
   const fetchData = () => {
     const sensorRef = ref(database, "sentry/readings");
+    const presenceRef = ref(database, "sentry/alerts/presence");
 
     const unsubscribe = onValue(sensorRef, async (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-
-        // Round the values
         const roundedData = {
           airQuality: data.airQuality ? Math.round(Number(data.airQuality)) : 0,
           humidity: data.humidity ? Math.round(Number(data.humidity)) : 0,
@@ -38,21 +40,66 @@ export default function HomeScreen() {
           temperature: data.temperature ? Math.round(Number(data.temperature)) : 0,
           noise: data.noise ? Math.round(Number(data.noise)) : 0,
         };
+
         await setItemInStorgae('temperature', roundedData.temperature.toString());
         await setItemInStorgae('humidity', roundedData.humidity.toString());
         await setItemInStorgae('pressure', roundedData.pressure.toString());
         await setItemInStorgae('airQuality', roundedData.airQuality.toString());
         await setItemInStorgae('noise', roundedData.noise.toString());
-        setSensorData(roundedData);
+        setSensorData(prevState => ({
+          ...prevState,
+          ...roundedData,
+        }));
       } else {
         console.log("No data available");
       }
     });
-    return () => unsubscribe();
 
+    // Subscribe to presence data
+    onValue(presenceRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const presenceData = snapshot.val();
+        decodeUltrasonicPresence(presenceData);
+      } else {
+        console.log("No presence data available");
+      }
+    });
+
+    return () => unsubscribe();
   };
 
-  //Helpers
+  const decodeUltrasonicPresence = (presenceData) => {
+    // Convert the presence data from Firebase to binary and map each sensor's 2 bits
+    const presenceValue = presenceData; // Assuming this is an 8-bit number received as a string or number
+    const decodedPresence = {
+      right: getUltrasonicState(presenceValue, 0),
+      left: getUltrasonicState(presenceValue, 2),
+      back: getUltrasonicState(presenceValue, 4),
+      front: getUltrasonicState(presenceValue, 6),
+    };
+
+    setSensorData((prevState) => ({
+      ...prevState,
+      ultrasonic: decodedPresence,
+    }));
+  };
+
+  const getUltrasonicState = (value, shift) => {
+    const state = (value >> shift) & 0b11; // Extract the 2 bits for the sensor
+    switch (state) {
+      case 0:
+        return "No presence detected";
+      case 1:
+        return "Presence weakly detected";
+      case 2:
+        return "Motion moderately detected";
+      case 3:
+        return "Motion strongly detected";
+      default:
+        return "Unknown state";
+    }
+  };
+
   const getTempFromStorage = async () => {
     const setVal = async function (one = null, two = null) {
       let val;
@@ -64,7 +111,7 @@ export default function HomeScreen() {
         val = two;
       }
       setMaxTemperature(val);
-    }
+    };
 
     try {
       const maxTemperatureFromStorage = await AsyncStorage.getItem("maxTemperature");
@@ -77,16 +124,14 @@ export default function HomeScreen() {
           if (maxTemperatureFromStorage) {
             var parsed = parseInt(maxTemperatureFromStorage);
             await setVal(data.temperature, parsed);
-          }
-          else {
+          } else {
             await setVal(data.temperature, 100);
           }
         } else {
           if (maxTemperatureFromStorage) {
             var parsed = parseInt(maxTemperatureFromStorage);
             await setVal(parsed, 100);
-          }
-          else {
+          } else {
             await setVal(100);
           }
         }
@@ -94,118 +139,43 @@ export default function HomeScreen() {
     } catch (error) {
       console.error(error);
     }
-  }
+  };
 
   const setItemInStorgae = async (name, val) => {
     await AsyncStorage.setItem(name, val);
-  }
-
-
-  // Only works on reload
-  // const updateStorageOnChange = async () => {
-  //   const sensorRef = ref(database, "sentry/readings");
-
-  //   onValue(sensorRef, async (snapshot) => {
-  //     if (snapshot.exists()) {
-  //       const data = await snapshot.val();
-  //       await setItemInStorgae('temperature', data.temperature.toString());
-  //       await setItemInStorgae('humidity', data.humidity.toString());
-  //       await setItemInStorgae('pressure', data.pressure.toString());
-  //       await setItemInStorgae('airQuality', data.airQuality.toString());
-  //       await setItemInStorgae('noise', data.noise.toString());
-  //     }
-  //   }
-  //   );
-  // }
+  };
 
   return (
     <View style={styles.container}>
-      {/* Title */}
       <Text style={styles.header}>Readings</Text>
-
-      {/* Refresh Button */}
       <TouchableOpacity onPress={fetchData} style={styles.refreshButton}>
         <Ionicons name="refresh" size={20} color="#fff" />
         <Text style={styles.refreshText}>Refresh</Text>
       </TouchableOpacity>
 
-      {/* Sensor Data Display */}
       <View style={styles.dashboard}>
+        {/* Other sensor readings */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Temperature</Text>
-          <View style={styles.cardContent}>
-            <CircularProgress
-              value={sensorData.temperature}
-              minimumValue={0}
-              maxValue={(maxTemperature > sensorData.temperature) ? maxTemperature : sensorData.temperature}
-              radius={35}
-              activeStrokeColor="#FF6347"
-              inActiveStrokeColor="#E8F0FE"
-              activeStrokeWidth={6}
-              inActiveStrokeWidth={6}
-            />
-            <Text style={styles.cardValue}>
-              {sensorData.temperature}°C
-            </Text>
-          </View>
+          <Text style={styles.cardTitle}>Right Ultrasonic</Text>
+          <Text style={styles.cardValue}>{sensorData.ultrasonic.right}</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Humidity</Text>
-          <View style={styles.cardContent}>
-            <CircularProgress
-              value={sensorData.humidity}
-              minimumValue={0}
-              maxValue={100}
-              radius={35}
-              activeStrokeColor="#00BFFF"
-              inActiveStrokeColor="#E8F0FE"
-              activeStrokeWidth={6}
-              inActiveStrokeWidth={6}
-            />
-            <Text style={styles.cardValue}>
-              {sensorData.humidity}%
-            </Text>
-          </View>
+          <Text style={styles.cardTitle}>Left Ultrasonic</Text>
+          <Text style={styles.cardValue}>{sensorData.ultrasonic.left}</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Pressure</Text>
-          <Text style={styles.cardContent}>
-            <CircularProgress
-              value={sensorData.pressure}
-              minimumValue={300}
-              maxValue={1100}
-              radius={35}
-              activeStrokeColor="#FFD700"
-              inActiveStrokeColor="#E8F0FE"
-              activeStrokeWidth={6}
-              inActiveStrokeWidth={6}
-            />
-            <Text style={styles.cardValue}>
-              {sensorData.pressure} hPa
-            </Text>
-          </Text>
+          <Text style={styles.cardTitle}>Back Ultrasonic</Text>
+          <Text style={styles.cardValue}>{sensorData.ultrasonic.back}</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Air Quality</Text>
-          <Text style={styles.cardContent}>
-            <CircularProgress
-              value={sensorData.airQuality}
-              minimumValue={0}
-              maxValue={500}
-              radius={35}
-              activeStrokeColor="#32CD32"
-              inActiveStrokeColor="#E8F0FE"
-              activeStrokeWidth={6}
-              inActiveStrokeWidth={6}
-            />
-            <Text style={styles.cardValue}>
-              {sensorData.airQuality} AQI
-              </Text>
-          </Text>
+          <Text style={styles.cardTitle}>Front Ultrasonic</Text>
+          <Text style={styles.cardValue}>{sensorData.ultrasonic.front}</Text>
         </View>
+
+        {/* Other cards */}
       </View>
     </View>
   );
@@ -243,7 +213,7 @@ const styles = StyleSheet.create({
   },
   dashboard: {
     width: "100%",
-    flex: 1, // Allows it to take up remaining space
+    flex: 1,
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
@@ -264,11 +234,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 20,
-  },
-  cardContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
   },
   cardValue: {
     color: "#fff",

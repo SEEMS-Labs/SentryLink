@@ -12,17 +12,47 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "plugins": [
+      [
+        "react-native-ble-plx",
+        {
+          "bluetoothAlwaysPermission": "We use Bluetooth to connect to your robot.",
+          "bluetoothPermission": "We use Bluetooth to connect to your robot.",
+          "bluetoothAdvertisePermission": "We use Bluetooth to connect to your robot."
+        }
+      ]
+    ],
     "ios": {
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "App needs Bluetooth access to connect to devices.",
+        "NSBluetoothPeripheralUsageDescription": "App uses Bluetooth to communicate with ESP32."
+      },
       "supportsTablet": true
     },
     "android": {
+      "permissions": [
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "ACCESS_FINE_LOCATION",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "googleServicesFile": "./google-services.json",
+      "package": "com.bedoabzd.MyApp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "9bcf6511-d71b-4425-b400-e709a03b542d"
+      }
+    },
+    "owner": "bedoabzd"
   }
 }
