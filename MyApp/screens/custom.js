@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Alert, TouchableOpacity } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Slider from "@react-native-community/slider";
+import PushNotification from "react-native-push-notification"; // Import push notification
 
 const CustomScreen = () => {
   // State for sensor values
@@ -10,6 +11,7 @@ const CustomScreen = () => {
   const [pressure, setPressure] = useState(null);
   const [airQuality, setAirQuality] = useState(null);
   const [noise, setNoise] = useState(null);
+  const [presence, setPresence] = useState(null); // Presence detection
 
   // State for thresholds – default values can be modified
   const [temperatureThreshold, setTemperatureThreshold] = useState(25);
@@ -17,6 +19,7 @@ const CustomScreen = () => {
   const [pressureThreshold, setPressureThreshold] = useState(1013);
   const [airQualityThreshold, setAirQualityThreshold] = useState(100);
   const [noiseThreshold, setNoiseThreshold] = useState(60);
+  const [presenceThreshold, setPresenceThreshold] = useState(2); // Threshold for presence detection
 
   // Helper: Get an item from AsyncStorage
   const getItemInStorage = async (key) => {
@@ -29,6 +32,25 @@ const CustomScreen = () => {
     }
   };
 
+  // Helper: Parse presence sensor data
+  const parsePresenceData = (data) => {
+    let presenceStates = [];
+    for (let i = 0; i < 4; i++) {
+      const sensorState = (data >> (i * 2)) & 3; // Extract the 2 bits for each sensor
+      presenceStates.push(sensorState);
+    }
+    return presenceStates;
+  };
+
+  // Function to send a push notification
+  const sendPresenceNotification = () => {
+    PushNotification.localNotification({
+      channelId: "presence-channel", // Make sure this is configured in your Push Notification setup
+      title: "Motion Detected!",
+      message: "One of the presence sensors detected moderate motion (5-10% change in readings).",
+    });
+  };
+
   // Fetch the sensor values from AsyncStorage and check thresholds
   const fetchData = async () => {
     const tempValue = await getItemInStorage("temperature");
@@ -36,6 +58,7 @@ const CustomScreen = () => {
     const pressureValue = await getItemInStorage("pressure");
     const airQualityValue = await getItemInStorage("airQuality");
     const noiseValue = await getItemInStorage("noise");
+    const presenceValue = await getItemInStorage("presence"); // 8-bit presence data
 
     // Convert the fetched string values into numbers
     const parsedTemp = tempValue ? Number(tempValue) : null;
@@ -43,6 +66,7 @@ const CustomScreen = () => {
     const parsedPressure = pressureValue ? Number(pressureValue) : null;
     const parsedAirQuality = airQualityValue ? Number(airQualityValue) : null;
     const parsedNoise = noiseValue ? Number(noiseValue) : null;
+    const parsedPresence = presenceValue ? Number(presenceValue) : null;
 
     // Update state with sensor values
     setTemperature(parsedTemp);
@@ -51,7 +75,18 @@ const CustomScreen = () => {
     setAirQuality(parsedAirQuality);
     setNoise(parsedNoise);
 
-    // Check thresholds and trigger alerts if needed
+    // Parse and set the presence states
+    const presenceStates = parsedPresence !== null ? parsePresenceData(parsedPresence) : [];
+    setPresence(presenceStates);
+
+    // Check presence states for "Motion moderately detected" (state 2)
+    presenceStates.forEach((state, index) => {
+      if (state === 2) {
+        sendPresenceNotification(); // Send notification when motion moderately detected
+      }
+    });
+
+    // Check other thresholds and trigger alerts if needed
     if (parsedTemp !== null && parsedTemp > temperatureThreshold) {
       Alert.alert("Alert", `Temperature (${parsedTemp}°C) exceeds the threshold (${temperatureThreshold}°C)!`);
     }
@@ -80,7 +115,7 @@ const CustomScreen = () => {
     // for now we simply show an alert confirming the values.
     Alert.alert(
       "Thresholds Confirmed",
-      `Temperature: ${temperatureThreshold}°C\nHumidity: ${humidityThreshold}%\nPressure: ${pressureThreshold} hPa\nAir Quality: ${airQualityThreshold} AQI\nNoise: ${noiseThreshold}`
+      `Temperature: ${temperatureThreshold}°C\nHumidity: ${humidityThreshold}%\nPressure: ${pressureThreshold} hPa\nAir Quality: ${airQualityThreshold} AQI\nNoise: ${noiseThreshold}\nPresence Threshold: ${presenceThreshold}`
     );
   };
 
@@ -88,7 +123,7 @@ const CustomScreen = () => {
     <View style={styles.container}>
       <Text style={styles.header}>Custom Sensor Settings</Text>
 
-      {/* Temperature  convert to F*/}   
+      {/* Temperature */}
       <View style={styles.sensorContainer}>
         <Text style={styles.sensorLabel}>Temperature: {temperature !== null ? temperature + "°C" : "Loading..."}</Text>
         <Text style={styles.sensorLabel}>Threshold: {temperatureThreshold}°C</Text>
@@ -172,7 +207,7 @@ const CustomScreen = () => {
         />
       </View>
 
-      {/* Noise  Add 24 inches to 156 inches for presense*/}
+      {/* Noise */}
       <View style={styles.sensorContainer}>
         <Text style={styles.sensorLabel}>Noise: {noise !== null ? noise : "Loading..."}</Text>
         <Text style={styles.sensorLabel}>Threshold: {noiseThreshold}</Text>
@@ -187,15 +222,14 @@ const CustomScreen = () => {
               Alert.alert("Alert", `Noise (${noise}) exceeds the threshold (${noiseThreshold})!`);
             }
           }}
-          minimumTrackTintColor="#8A2BE2"
+          minimumTrackTintColor="#FF6347"
           maximumTrackTintColor="#000000"
-          thumbTintColor="#8A2BE2"
+          thumbTintColor="#FF6347"
         />
-      </View> 
+      </View>
 
-      {/* Confirm Button */}
       <TouchableOpacity style={styles.confirmButton} onPress={confirmThresholds}>
-        <Text style={styles.confirmButtonText}>Confirm</Text>
+        <Text style={styles.confirmButtonText}>Confirm Thresholds</Text>
       </TouchableOpacity>
     </View>
   );
@@ -204,44 +238,39 @@ const CustomScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#2c3338",
     padding: 20,
-    paddingTop: 50,
-    justifyContent: "flex-start",
+    backgroundColor: "#282828",
   },
   header: {
     fontSize: 24,
     color: "#fff",
-    textAlign: "center",
+    fontWeight: "bold",
     marginBottom: 20,
+    textAlign: "center",
   },
   sensorContainer: {
-    marginBottom: 30,
+    marginBottom: 20,
   },
   sensorLabel: {
+    fontSize: 18,
     color: "#fff",
-    fontSize: 16,
-    marginBottom: 5,
+    marginBottom: 10,
   },
   slider: {
     width: "100%",
     height: 40,
   },
   confirmButton: {
-  flexDirection: "row",
-  justifyContent: "center",
-  alignItems: "center",
-  backgroundColor: "#C57B57",
-  padding: 10,
-  borderRadius: 50,
-  marginBottom: 30,
-  alignSelf: "center", // centers the button
-  width: 150,         // fixed width for the button
-},
-confirmButtonText: {
-  color: "#fff",
-  fontSize: 16,
-},
+    backgroundColor: "#4CAF50",
+    padding: 15,
+    borderRadius: 5,
+    alignItems: "center",
+  },
+  confirmButtonText: {
+    fontSize: 18,
+    color: "#fff",
+    fontWeight: "bold",
+  },
 });
 
 export default CustomScreen;

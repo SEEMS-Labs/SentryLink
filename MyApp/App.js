@@ -10,12 +10,16 @@ import { onAuthStateChanged, User } from "firebase/auth";
 import { auth, database } from './Firebase/firebaseConfig';
 import { getAuth, signOut } from "firebase/auth";
 import { getDatabase, ref, set } from "firebase/database";
+import PushNotification from "react-native-push-notification";
+ // PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
 
 import LoginScreen from "./screens/authen";
 import HomeScreen from "./screens/home";
 import CameraScreen  from "./screens/Cam";
 import CustomScreen from './screens/custom';
-//import WiFiSetup from "./screens/WiFiSetup";
+import WiFiSetup from "./screens/WiFiSetup";
+
+
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();

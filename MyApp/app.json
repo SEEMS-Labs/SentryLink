@@ -23,17 +23,22 @@
       ]
     ],
     "ios": {
+      "bundleIdentifier": "com.yourname.appname",
+      "supportsTablet": true,
+      "buildNumber": "1.0.0",
       "infoPlist": {
+        "UIBackgroundModes": ["fetch", "remote-notification"],
         "NSBluetoothAlwaysUsageDescription": "App needs Bluetooth access to connect to devices.",
         "NSBluetoothPeripheralUsageDescription": "App uses Bluetooth to communicate with ESP32."
-      },
-      "supportsTablet": true
+      }
     },
     "android": {
       "permissions": [
+        "NOTIFICATIONS",
         "BLUETOOTH",
         "BLUETOOTH_ADMIN",
         "ACCESS_FINE_LOCATION",
+        "INTERNET",
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_CONNECT"
@@ -47,6 +52,10 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "iosDisplayInForeground": true
     },
     "extra": {
       "eas": {
