@@ -4,6 +4,7 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "fire
 import { auth } from "../Firebase/firebaseConfig";
 import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
 
 const LoginScreen = () => {
   const [email, setEmail] = useState("");
@@ -18,6 +19,9 @@ const LoginScreen = () => {
       setError("");
       await signInWithEmailAndPassword(auth, email, password);
       alert("Logged in successfully!");
+      
+      // Save the login status to AsyncStorage
+      await AsyncStorage.setItem('isLoggedIn', 'true');
     } catch (error) {
       setError(error.message);
     } finally {

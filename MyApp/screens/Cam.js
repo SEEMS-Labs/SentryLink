@@ -9,34 +9,7 @@ const CamScreen = () => {
 
   const streamUrl = 'http://192.168.25.13'; // Your MJPEG stream URL
 
-  const htmlContent = `
-    <html>
-    <body style="margin:0; padding:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background-color:black;">
-      <img id="stream" src="${streamUrl}" style="width:100vw; height:auto;" />
-      <p id="fps" style="color:white; font-size:20px; position:absolute; top:10px; left:10px;"></p>
-
-      <script>
-        let frameCount = 0;
-        let lastTime = performance.now();
-
-        function trackFPS() {
-          frameCount++;
-          let now = performance.now();
-          if (now - lastTime >= 1000) {
-            document.getElementById("fps").innerText = "FPS: " + frameCount;
-            window.ReactNativeWebView.postMessage(frameCount.toString());
-            frameCount = 0;
-            lastTime = now;
-          }
-          requestAnimationFrame(trackFPS);
-        }
-
-        trackFPS();
-      </script>
-    </body>
-    </html>
-  `;
-
+  
   return (
     <View style={{ flex: 1 }}>
       {isStreaming && (

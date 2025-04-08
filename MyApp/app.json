@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "MyApp",
+    "name": "SEEMS",
     "slug": "MyApp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/SEEMS_LOGO.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -13,6 +13,7 @@
       "backgroundColor": "#ffffff"
     },
     "plugins": [
+      "expo-notifications",
       [
         "react-native-ble-plx",
         {
@@ -37,14 +38,12 @@
         "NOTIFICATIONS",
         "BLUETOOTH",
         "BLUETOOTH_ADMIN",
+        "BLUETOOTH_CONNECT",
         "ACCESS_FINE_LOCATION",
-        "INTERNET",
-        "android.permission.BLUETOOTH",
-        "android.permission.BLUETOOTH_ADMIN",
-        "android.permission.BLUETOOTH_CONNECT"
+        "INTERNET"
       ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/SEEMS_LOGO.png",
         "backgroundColor": "#ffffff"
       },
       "googleServicesFile": "./google-services.json",
@@ -54,8 +53,10 @@
       "favicon": "./assets/favicon.png"
     },
     "notification": {
-      "icon": "./assets/notification-icon.png",
-      "iosDisplayInForeground": true
+      "icon": "./assets/images/react-logo.png",
+      "iosDisplayInForeground": true,
+      "androidMode": "default",
+      "androidCollapsedTitle": "Your App Notification"
     },
     "extra": {
       "eas": {
