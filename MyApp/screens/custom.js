@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Alert, TouchableOpacity } from "react-native";
 import Slider from "@react-native-community/slider";
 import { database } from "../Firebase/firebaseConfig";
-import { ref, get } from "firebase/database";
+import { update,ref, get, set } from "firebase/database";
 import { registerForPushNotificationsAsync } from "./NotificationHandler";
 
 const CustomScreen = () => {
@@ -24,29 +24,37 @@ const CustomScreen = () => {
     presence: "",
   });
 
-   // Decodes 8-bit presence value into individual sensor states
+  // Decodes 8-bit presence value into individual sensor states
   const decodePresence = (value) => {
+    const bitValue = value & 0xFF;  // Mask to 8 bits (values between 0-255)
     const sensorStates = {
-      right: (value & 0b11),        // Bits 0-1
-      left: ((value >> 2) & 0b11),   // Bits 2-3
-      back: ((value >> 4) & 0b11),   // Bits 4-5
-      front: ((value >> 6) & 0b11),  // Bits 6-7
+      right: (bitValue & 0b11),
+      left: ((bitValue >> 2) & 0b11),
+      back: ((bitValue >> 4) & 0b11),
+      front: ((bitValue >> 6) & 0b11),
     };
 
-    // Alert logic based on sensor state
+    console.log("Decoded sensor states: ", sensorStates);
+    console.log("Raw presence value (in decimal): ", value);
+    console.log("Raw presence value (in binary): ", value.toString(2).padStart(8, "0"));
+
     Object.entries(sensorStates).forEach(([sensor, state]) => {
       switch (state) {
         case 0:
-          break; // No presence detected
+          console.log(`${capitalize(sensor)}: No presence detected`);
+          break;
         case 1:
+          console.log(`${capitalize(sensor)}: Weak presence detected`);
           Alert.alert(`${capitalize(sensor)} Sensor Alert`, `${capitalize(sensor)} weak presence detected.`);
           registerForPushNotificationsAsync(`${capitalize(sensor)} weak presence detected.`);
           break;
         case 2:
+          console.log(`${capitalize(sensor)}: Presence certain, motion possible`);
           Alert.alert(`${capitalize(sensor)} Sensor Alert`, `${capitalize(sensor)} presence certain, motion possible.`);
           registerForPushNotificationsAsync(`${capitalize(sensor)} presence certain, motion possible.`);
           break;
         case 3:
+          console.log(`${capitalize(sensor)}: Strong motion detected`);
           Alert.alert(`${capitalize(sensor)} Sensor Alert`, `${capitalize(sensor)} strong motion detected.`);
           registerForPushNotificationsAsync(`${capitalize(sensor)} strong motion detected.`);
           break;
@@ -56,9 +64,44 @@ const CustomScreen = () => {
     });
   };
 
+ const sendThresholdsToFirebase = () => {
+    // Log initial thresholds to verify what we're starting with
+    console.log("Initial thresholds:", thresholds);
+
+    // Apply bitwise mask and shift each value into its correct 64-bit position
+    const temperatureThreshold = thresholds.temperature & 0x7F; // Masking 7 bits
+    const humidityThreshold = thresholds.humidity & 0x1FF;   // Masking 9 bits
+    const noiseThreshold = thresholds.noise & 0xFF;           // Masking 8 bits
+    const presenceThreshold = thresholds.presence & 0x1FF;    // Masking 9 bits
+    const airQualityThreshold = thresholds.airQuality & 0x1FF; // Masking 9 bits
+    const pressureThreshold = thresholds.pressure & 0x7FF;    // Masking 11 bits
+
+    // Shift each threshold into its correct position in the 64-bit value
+    const combinedThresholds = 
+        (temperatureThreshold << 0) |   // Shift temperature threshold (7 bits) into the lower bits
+        (humidityThreshold << 7) |      // Shift humidity threshold (9 bits) into the next position
+        (noiseThreshold << 16) |        // Shift noise threshold (8 bits) into the next position
+        (presenceThreshold << 24) |     // Shift presence threshold (9 bits) into the next position
+        (airQualityThreshold << 33) |   // Shift air quality threshold (9 bits) into the next position
+        (pressureThreshold << 42);      // Shift pressure threshold (11 bits) into the next position
+
+    // Log the combined 64-bit value to verify
+    console.log("Combined Thresholds (64-bit):", combinedThresholds);
+
+    // Send the combined 64-bit value to Firebase
+    const thresholdsRef = ref(database, '/sentrylink/');
+    update(thresholdsRef, {
+        user_config: combinedThresholds,  // Send as a single 64-bit value
+    }).then(() => {
+        console.log("Thresholds successfully updated in Firebase");
+    }).catch((error) => {
+        console.error("Error sending thresholds to Firebase:", error);
+    });
+  };
+  
   const fetchAndCheck = async () => {
     try {
-      const paths = ["temperature", "humidity", "pressure", "airQuality", "noise", "presence" ];
+      const paths = ["temperature", "humidity", "pressure", "airQuality", "noise", "presence"];
       const newValues = { ...sensorValues };
 
       for (const key of paths) {
@@ -70,28 +113,31 @@ const CustomScreen = () => {
 
       setSensorValues(newValues);
 
-      // Decode and check the presence sensor value
-      if (newValues.Presence !== undefined) {
-        decodePresence(newValues.Presence);
+      if (newValues.presence !== undefined) {
+        decodePresence(newValues.presence);
       }
 
       // Debug: Log the fetched values
       console.log("Fetched sensor values: ", newValues);
 
-      // Alert if over threshold, every time
+      // Check if any value exceeds its threshold
       Object.entries(newValues).forEach(([key, value]) => {
-        if (key !== "Presence" && value > thresholds[key]) {
+        if (key !== "presence" && value > thresholds[key]) {
           Alert.alert(`${capitalize(key)} Alert`, `${capitalize(key)} exceeds threshold: ${value}`);
           registerForPushNotificationsAsync(`${capitalize(key)} exceeds threshold: ${value}`);
         }
       });
+
+      // Send thresholds to Firebase
+      sendThresholdsToFirebase();
+
     } catch (error) {
       console.error("Error fetching sensor data:", error);
     }
   };
 
   useEffect(() => {
-    const interval = setInterval(fetchAndCheck, 20000); // every 20 seconds
+    const interval = setInterval(fetchAndCheck, 2000000); // every 20 seconds
     return () => clearInterval(interval);
   }, [thresholds]);
 
@@ -133,7 +179,7 @@ const CustomScreen = () => {
 
       {renderSensor("temperature", "°F", 30, 70, "red")}
       {renderSensor("humidity", "%", 0, 100, "#00BFFF")}
-      {renderSensor("pressure", "hPa", 300, 1100, "grey")}
+      {renderSensor("pressure", "hPa", 300, 1300, "grey")}
       {renderSensor("airQuality", "AQI", 50, 500, "#32CD32")}
       {renderSensor("noise", "dB", 80, 120, "yellow")}
 

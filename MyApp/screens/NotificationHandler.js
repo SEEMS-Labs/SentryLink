@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 
-export async function registerForPushNotificationsAsync() {
+export async function registerForPushNotificationsAsync(message) {
   if (!Device.isDevice) {
     alert('Must use physical device for push notifications');
     return;
@@ -27,5 +27,15 @@ export async function registerForPushNotificationsAsync() {
 
   const token = tokenResponse.data;
   console.log('Expo Push Token:', token);
-  return token;
+
+  // Send push notification
+  if (token) {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Sensor Alert",
+        body: message,  // Message received from the calling function
+      },
+      trigger: null, // Set to null to trigger immediately
+    });
+  }
 }

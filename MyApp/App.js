@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, PermissionsAndroid, Platform } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -8,16 +8,37 @@ import * as Notifications from 'expo-notifications';
 import { onAuthStateChanged, signOut, getAuth } from "firebase/auth";
 import { getDatabase, ref, set } from "firebase/database";
 import { auth } from './Firebase/firebaseConfig';
+import { registerForPushNotificationsAsync } from './screens/NotificationHandler';
 
 import LoginScreen from "./screens/authen";
 import HomeScreen from "./screens/home";
 import CameraScreen from "./screens/Cam";
 import CustomScreen from './screens/custom';
 import WiFiSetup from "./screens/WiFiSetup";
-import { registerForPushNotificationsAsync } from './screens/NotificationHandler';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
+
+// BLE Permission request for Android 12+
+const requestBluetoothPermissions = async () => {
+  if (Platform.OS === 'android' && Platform.Version >= 31) {
+    try {
+      const granted = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      ]);
+      const allGranted = Object.values(granted).every(
+        value => value === PermissionsAndroid.RESULTS.GRANTED
+      );
+      if (!allGranted) {
+        console.warn("Not all Bluetooth permissions granted");
+      }
+    } catch (err) {
+      console.warn("Permission error:", err);
+    }
+  }
+};
 
 function MyTabs() {
   const handleLogout = async () => {
@@ -41,12 +62,19 @@ function MyTabs() {
 
 export default function App() {
   const [user, setUser] = useState(null);
+  const [skipWiFi, setSkipWiFi] = useState(false);
 
   useEffect(() => {
+    requestBluetoothPermissions();
+
+    // Register for push notifications and handle token
     registerForPushNotificationsAsync().then(token => {
-      if (token) {
-        console.log("Push notification token:", token);
-        // TODO: Send token to server here if needed
+      if (token && user) {
+        const db = getDatabase();
+        const userTokenRef = ref(db, `users/${user.uid}/push_token`);
+        set(userTokenRef, token)
+          .then(() => console.log("Push notification token saved in database"))
+          .catch((error) => console.error("Error saving token:", error));
       }
     });
 
@@ -57,7 +85,6 @@ export default function App() {
 
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
       console.log("User interacted with notification:", response);
-      // navigate or handle the notification 
     });
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -65,8 +92,6 @@ export default function App() {
       setUser(user);
       const db = getDatabase();
       const userStatusRef = ref(db, "sentrylink/user_in_app");
-
-      // Update the database element: true if user exists, false otherwise
       set(userStatusRef, user ? true : false)
         .then(() => console.log("User in app status updated"))
         .catch((error) => console.error("Error updating user status:", error));
@@ -77,15 +102,22 @@ export default function App() {
       Notifications.removeNotificationSubscription(notificationListener);
       Notifications.removeNotificationSubscription(responseListener);
     };
-  }, []);
+  }, [user]);
 
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Login">
-        {user ? (
-          <Stack.Screen name="Inside" component={MyTabs} options={{ headerShown: false }} />
-        ) : (
+        {!user ? (
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+        ) : !skipWiFi ? (
+          <Stack.Screen
+            name="WiFiSetup"
+            options={{ headerShown: true }}
+          >
+            {(props) => <WiFiSetup {...props} onSkip={() => setSkipWiFi(true)} />}
+          </Stack.Screen>
+        ) : (
+          <Stack.Screen name="Inside" component={MyTabs} options={{ headerShown: false }} />
         )}
       </Stack.Navigator>
     </NavigationContainer>
