@@ -1,204 +1,145 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Alert, TouchableOpacity } from "react-native";
 import Slider from "@react-native-community/slider";
-import { database } from "../Firebase/firebaseConfig"; // Custom firebaseConfig
-import { ref, onValue, off } from "firebase/database"; // Correct Firebase imports
+import { database } from "../Firebase/firebaseConfig";
+import { ref, get } from "firebase/database";
+import { registerForPushNotificationsAsync } from "./NotificationHandler";
 
 const CustomScreen = () => {
-  // State for sensor data
-  const [temperature, setTemperature] = useState(22);
-  const [humidity, setHumidity] = useState(50);
-  const [pressure, setPressure] = useState(1015);
-  const [airQuality, setAirQuality] = useState(75);
-  const [noise, setNoise] = useState(55);
+  const [thresholds, setThresholds] = useState({
+    temperature: 75, // Initial threshold set to 75°F for temperature
+    humidity: 60,
+    pressure: 1013,
+    airQuality: 150,
+    noise: 90,
+    presence: "",
+  });
 
-  // State for thresholds
-  const [temperatureThreshold, setTemperatureThreshold] = useState(25);
-  const [humidityThreshold, setHumidityThreshold] = useState(60);
-  const [pressureThreshold, setPressureThreshold] = useState(1020);
-  const [airQualityThreshold, setAirQualityThreshold] = useState(100);
-  const [noiseThreshold, setNoiseThreshold] = useState(60);
+  const [sensorValues, setSensorValues] = useState({
+    temperature: "",
+    humidity: "",
+    pressure: "",
+    airQuality: "",
+    noise: "",
+    presence: "",
+  });
 
-  // State for alert flags (to prevent repeated alerts)
-  const [temperatureAlertShown, setTemperatureAlertShown] = useState(false);
-  const [humidityAlertShown, setHumidityAlertShown] = useState(false);
-  const [pressureAlertShown, setPressureAlertShown] = useState(false);
-  const [airQualityAlertShown, setAirQualityAlertShown] = useState(false);
-  const [noiseAlertShown, setNoiseAlertShown] = useState(false);
+   // Decodes 8-bit presence value into individual sensor states
+  const decodePresence = (value) => {
+    const sensorStates = {
+      right: (value & 0b11),        // Bits 0-1
+      left: ((value >> 2) & 0b11),   // Bits 2-3
+      back: ((value >> 4) & 0b11),   // Bits 4-5
+      front: ((value >> 6) & 0b11),  // Bits 6-7
+    };
 
-  // Function to check thresholds and send alert once
-  const checkThresholds = () => {
-    if (temperature > temperatureThreshold && !temperatureAlertShown) {
-      Alert.alert("Temperature Alert", `Temperature exceeds threshold: ${temperature}°C`);
-      setTemperatureAlertShown(true); // Prevent repeated alert
-    }
-    if (humidity > humidityThreshold && !humidityAlertShown) {
-      Alert.alert("Humidity Alert", `Humidity exceeds threshold: ${humidity}%`);
-      setHumidityAlertShown(true); // Prevent repeated alert
-    }
-    if (pressure > pressureThreshold && !pressureAlertShown) {
-      Alert.alert("Pressure Alert", `Pressure exceeds threshold: ${pressure} hPa`);
-      setPressureAlertShown(true); // Prevent repeated alert
-    }
-    if (airQuality > airQualityThreshold && !airQualityAlertShown) {
-      Alert.alert("Air Quality Alert", `Air Quality exceeds threshold: ${airQuality}`);
-      setAirQualityAlertShown(true); // Prevent repeated alert
-    }
-    if (noise > noiseThreshold && !noiseAlertShown) {
-      Alert.alert("Noise Alert", `Noise exceeds threshold: ${noise} dB`);
-      setNoiseAlertShown(true); // Prevent repeated alert
+    // Alert logic based on sensor state
+    Object.entries(sensorStates).forEach(([sensor, state]) => {
+      switch (state) {
+        case 0:
+          break; // No presence detected
+        case 1:
+          Alert.alert(`${capitalize(sensor)} Sensor Alert`, `${capitalize(sensor)} weak presence detected.`);
+          registerForPushNotificationsAsync(`${capitalize(sensor)} weak presence detected.`);
+          break;
+        case 2:
+          Alert.alert(`${capitalize(sensor)} Sensor Alert`, `${capitalize(sensor)} presence certain, motion possible.`);
+          registerForPushNotificationsAsync(`${capitalize(sensor)} presence certain, motion possible.`);
+          break;
+        case 3:
+          Alert.alert(`${capitalize(sensor)} Sensor Alert`, `${capitalize(sensor)} strong motion detected.`);
+          registerForPushNotificationsAsync(`${capitalize(sensor)} strong motion detected.`);
+          break;
+        default:
+          break;
+      }
+    });
+  };
+
+  const fetchAndCheck = async () => {
+    try {
+      const paths = ["temperature", "humidity", "pressure", "airQuality", "noise", "presence" ];
+      const newValues = { ...sensorValues };
+
+      for (const key of paths) {
+        const snap = await get(ref(database, `/sentry/readings/${key}`));
+        if (snap.exists()) {
+          newValues[key] = snap.val();
+        }
+      }
+
+      setSensorValues(newValues);
+
+      // Decode and check the presence sensor value
+      if (newValues.Presence !== undefined) {
+        decodePresence(newValues.Presence);
+      }
+
+      // Debug: Log the fetched values
+      console.log("Fetched sensor values: ", newValues);
+
+      // Alert if over threshold, every time
+      Object.entries(newValues).forEach(([key, value]) => {
+        if (key !== "Presence" && value > thresholds[key]) {
+          Alert.alert(`${capitalize(key)} Alert`, `${capitalize(key)} exceeds threshold: ${value}`);
+          registerForPushNotificationsAsync(`${capitalize(key)} exceeds threshold: ${value}`);
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching sensor data:", error);
     }
   };
 
-  // UseEffect to simulate data fetch and threshold checks
   useEffect(() => {
-    // Set up Firebase listeners to fetch real-time data
-    const temperatureRef = ref(database, '/sensorData/temperature');
-    const humidityRef = ref(database, '/sensorData/humidity');
-    const pressureRef = ref(database, '/sensorData/pressure');
-    const airQualityRef = ref(database, '/sensorData/airQuality');
-    const noiseRef = ref(database, '/sensorData/noise');
+    const interval = setInterval(fetchAndCheck, 20000); // every 20 seconds
+    return () => clearInterval(interval);
+  }, [thresholds]);
 
-    // Listen for changes in the sensor values (but only update every 10 seconds)
-    const intervalId = setInterval(() => {
-      // Fetch the latest sensor values
-      onValue(temperatureRef, snapshot => {
-        if (snapshot.exists()) {
-          setTemperature(snapshot.val());  // Update temperature
-        }
-      });
+  const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-      onValue(humidityRef, snapshot => {
-        if (snapshot.exists()) {
-          setHumidity(snapshot.val());  // Update humidity
-        }
-      });
-
-      onValue(pressureRef, snapshot => {
-        if (snapshot.exists()) {
-          setPressure(snapshot.val());  // Update pressure
-        }
-      });
-
-      onValue(airQualityRef, snapshot => {
-        if (snapshot.exists()) {
-          setAirQuality(snapshot.val());  // Update air quality
-        }
-      });
-
-      onValue(noiseRef, snapshot => {
-        if (snapshot.exists()) {
-          setNoise(snapshot.val());  // Update noise
-        }
-      });
-
-      // Check the thresholds after values are updated
-      checkThresholds();
-    }, 10000); // 10 seconds
-
-    // Clean up listeners and interval when the component unmounts
-    return () => {
-      off(temperatureRef);
-      off(humidityRef);
-      off(pressureRef);
-      off(airQualityRef);
-      off(noiseRef);
-      clearInterval(intervalId); // Clear the interval when component unmounts
-    };
-  }, [temperature, humidity, pressure, airQuality, noise]); // Dependencies ensure that the checks happen every time data changes
-
-  // Reset alert flags when data is updated
-  const resetAlertFlags = () => {
-    setTemperatureAlertShown(false);
-    setHumidityAlertShown(false);
-    setPressureAlertShown(false);
-    setAirQualityAlertShown(false);
-    setNoiseAlertShown(false);
+  const renderSensor = (label, unit, min, max, color) => {
+    const value = sensorValues[label];
+    const threshold = thresholds[label];
+    return (
+      <View style={styles.sensorContainer}>
+        <Text style={styles.sensorLabel}>
+          {capitalize(label)}: {value != null ? `${label === "temperature" ? Math.round(value * (9/5) + 32) : value} ${unit}` : "Loading..."}
+        </Text>
+        <Text style={styles.sensorLabel}>
+          Threshold: {label === "temperature" ? Math.round(threshold * (9/5) + 32) : threshold} {unit}
+        </Text>
+        <Slider
+          style={styles.slider}
+          minimumValue={min}
+          maximumValue={max}
+          value={threshold}
+          onValueChange={(val) =>
+            setThresholds((prev) => ({
+              ...prev,
+              [label]: Math.round(val),
+            }))
+          }
+          minimumTrackTintColor={color}
+          maximumTrackTintColor="#000"
+          thumbTintColor={color}
+        />
+      </View>
+    );
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Custom Sensor Settings</Text>
 
-      {/* Temperature */}
-      <View style={styles.sensorContainer}>
-        <Text style={styles.sensorLabel}>Temperature: {temperature !== null ? temperature + "°C" : "Loading..."}</Text>
-        <Text style={styles.sensorLabel}>Threshold: {temperatureThreshold}°C</Text>
-        <Slider
-          style={styles.slider}
-          minimumValue={-40}
-          maximumValue={85}
-          value={temperatureThreshold}
-          onValueChange={(value) => setTemperatureThreshold(Math.round(value))}
-          minimumTrackTintColor="#FF6347"
-          maximumTrackTintColor="#000000"
-          thumbTintColor="#FF6347"
-        />
-      </View>
+      {renderSensor("temperature", "°F", 30, 70, "red")}
+      {renderSensor("humidity", "%", 0, 100, "#00BFFF")}
+      {renderSensor("pressure", "hPa", 300, 1100, "grey")}
+      {renderSensor("airQuality", "AQI", 50, 500, "#32CD32")}
+      {renderSensor("noise", "dB", 80, 120, "yellow")}
 
-      {/* Humidity */}
-      <View style={styles.sensorContainer}>
-        <Text style={styles.sensorLabel}>Humidity: {humidity !== null ? humidity + "%" : "Loading..."}</Text>
-        <Text style={styles.sensorLabel}>Threshold: {humidityThreshold}%</Text>
-        <Slider
-          style={styles.slider}
-          minimumValue={0}
-          maximumValue={100}
-          value={humidityThreshold}
-          onValueChange={(value) => setHumidityThreshold(Math.round(value))}
-          minimumTrackTintColor="#00BFFF"
-          maximumTrackTintColor="#000000"
-          thumbTintColor="#00BFFF"
-        />
-      </View>
-
-      {/* Pressure */}
-      <View style={styles.sensorContainer}>
-        <Text style={styles.sensorLabel}>Pressure: {pressure !== null ? pressure + " hPa" : "Loading..."}</Text>
-        <Text style={styles.sensorLabel}>Threshold: {pressureThreshold} hPa</Text>
-        <Slider
-          style={styles.slider}
-          minimumValue={300}
-          maximumValue={1100}
-          value={pressureThreshold}
-          onValueChange={(value) => setPressureThreshold(Math.round(value))}
-          minimumTrackTintColor="#32CD32"
-          maximumTrackTintColor="#000000"
-          thumbTintColor="#32CD32"
-        />
-      </View>
-
-      {/* Air Quality */}
-      <View style={styles.sensorContainer}>
-        <Text style={styles.sensorLabel}>Air Quality: {airQuality !== null ? airQuality + " AQI" : "Loading..."}</Text>
-        <Text style={styles.sensorLabel}>Threshold: {airQualityThreshold} AQI</Text>
-        <Slider
-          style={styles.slider}
-          minimumValue={50}
-          maximumValue={500}
-          value={airQualityThreshold}
-          onValueChange={(value) => setAirQualityThreshold(Math.round(value))}
-          minimumTrackTintColor="#FFD700"
-          maximumTrackTintColor="#000000"
-          thumbTintColor="#FFD700"
-        />
-      </View>
-
-      {/* Noise */}
-      <View style={styles.sensorContainer}>
-        <Text style={styles.sensorLabel}>Noise: {noise !== null ? noise : "Loading..."}</Text>
-        <Text style={styles.sensorLabel}>Threshold: {noiseThreshold}</Text>
-        <Slider
-          style={styles.slider}
-          minimumValue={80}
-          maximumValue={120}
-          value={noiseThreshold}
-          onValueChange={(value) => setNoiseThreshold(Math.round(value))}
-          minimumTrackTintColor="#FF6347"
-          maximumTrackTintColor="#000000"
-          thumbTintColor="#FF6347"
-        />
-      </View>
+      <TouchableOpacity style={styles.button} onPress={fetchAndCheck}>
+        <Text style={styles.buttonText}>Manual Check Now</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -227,6 +168,18 @@ const styles = StyleSheet.create({
   slider: {
     width: "100%",
     height: 40,
+  },
+  button: {
+    marginTop: 20,
+    backgroundColor: "#1e90ff",
+    padding: 15,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
   },
 });
 

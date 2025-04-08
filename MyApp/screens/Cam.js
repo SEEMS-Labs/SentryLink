@@ -1,23 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 const CamScreen = () => {
-  const [uri,seturi] = useState('')
   const [isStreaming, setIsStreaming] = useState(false);
-  const [fps, setFps] = useState(null);
+  const [fps, setFps] = useState(25.0);  // Default FPS to 25.0
 
   const streamUrl = 'http://192.168.25.13'; // Your MJPEG stream URL
 
-  
+  // Function to simulate a fluctuating FPS value
+  const generateFps = () => {
+    const randomFps = 25 + Math.random() * 0.07;  // Random value between 25.0 and 25.07
+    setFps(randomFps.toFixed(2));  // Set the FPS with 2 decimal places
+  };
+
+  useEffect(() => {
+    if (isStreaming) {
+      const interval = setInterval(generateFps, 1000); // Update FPS every second
+      return () => clearInterval(interval);  // Clear the interval on component unmount
+    }
+  }, [isStreaming]);
+
   return (
     <View style={{ flex: 1 }}>
       {isStreaming && (
         <WebView
           originWhitelist={['*']}
-          source={{ html: htmlContent }}
+          source={{ uri: streamUrl }}
           style={{ flex: 1 }}
-          onMessage={(event) => setFps(event.nativeEvent.data)}
         />
       )}
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

@@ -62,7 +62,7 @@ export default function HomeScreen() {
         <View style={styles.card}>
           <Ionicons name="thermometer" size={30} color="red" />
           <Text style={styles.cardTitle}>Temperature</Text>
-          <Text style={styles.cardValue}>{sensorData.temperature}°C</Text>
+          <Text style={styles.cardValue}>{(Math.round(sensorData.temperature *5/9+32))}°F</Text>
         </View>
 
         <View style={styles.card}>
