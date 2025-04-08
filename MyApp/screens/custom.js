@@ -7,7 +7,7 @@ import { registerForPushNotificationsAsync } from "./NotificationHandler";
 
 const CustomScreen = () => {
   const [thresholds, setThresholds] = useState({
-    temperature: 75, // Initial threshold set to 75°F for temperature
+    temperature: 65, // Initial threshold set to 75°C for temperature
     humidity: 60,
     pressure: 1013,
     airQuality: 150,
@@ -79,11 +79,11 @@ const CustomScreen = () => {
     // Shift each threshold into its correct position in the 64-bit value
     const combinedThresholds = 
         (temperatureThreshold << 0) |   // Shift temperature threshold (7 bits) into the lower bits
-        (humidityThreshold << 7) |      // Shift humidity threshold (9 bits) into the next position
-        (noiseThreshold << 16) |        // Shift noise threshold (8 bits) into the next position
-        (presenceThreshold << 24) |     // Shift presence threshold (9 bits) into the next position
-        (airQualityThreshold << 33) |   // Shift air quality threshold (9 bits) into the next position
-        (pressureThreshold << 42);      // Shift pressure threshold (11 bits) into the next position
+        (humidityThreshold << 7) |      // Shift humidity threshold (7 bits) into the next position
+        (noiseThreshold << 14) |        // Shift noise threshold (7 bits) into the next position
+        (presenceThreshold << 21) |     // Shift presence threshold (9 bits) into the next position
+        (airQualityThreshold << 30) |   // Shift air quality threshold (9 bits) into the next position
+        (pressureThreshold << 39);      // Shift pressure threshold (11 bits) into the next position
 
     // Log the combined 64-bit value to verify
     console.log("Combined Thresholds (64-bit):", combinedThresholds);
@@ -137,7 +137,7 @@ const CustomScreen = () => {
   };
 
   useEffect(() => {
-    const interval = setInterval(fetchAndCheck, 2000000); // every 20 seconds
+    const interval = setInterval(fetchAndCheck, 200000); // every 20 seconds
     return () => clearInterval(interval);
   }, [thresholds]);
 
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: "#282828",
+    backgroundColor: "#25292e",
   },
   header: {
     fontSize: 24,

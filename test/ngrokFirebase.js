@@ -16,7 +16,7 @@ const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
 // Example of writing to Firebase
-set(ref(database, 'camera/ip'), 'YOUR_NGROK_URL')
+set(ref(database, 'camera/ip'), 'https://e327-2603-9001-8000-27b5-e86f-cdfb-a8ae-7315.ngrok-free.app ')
   .then(() => {
     console.log('Data saved successfully!');
   })

@@ -109,13 +109,6 @@ export default function App() {
       <Stack.Navigator initialRouteName="Login">
         {!user ? (
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-        ) : !skipWiFi ? (
-          <Stack.Screen
-            name="WiFiSetup"
-            options={{ headerShown: true }}
-          >
-            {(props) => <WiFiSetup {...props} onSkip={() => setSkipWiFi(true)} />}
-          </Stack.Screen>
         ) : (
           <Stack.Screen name="Inside" component={MyTabs} options={{ headerShown: false }} />
         )}
