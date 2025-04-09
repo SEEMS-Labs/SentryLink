@@ -10,7 +10,8 @@ const WiFiSetup = ({ navigation }) => {
   useEffect(() => {
     // Cleanup when the component unmounts
     return () => {
-      manager.stopDeviceScan();
+      manager.stopDevice
+      Scan();
     };
   }, []);
 

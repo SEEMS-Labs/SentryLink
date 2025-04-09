@@ -137,7 +137,7 @@ const CustomScreen = () => {
   };
 
   useEffect(() => {
-    const interval = setInterval(fetchAndCheck, 200000); // every 20 seconds
+    const interval = setInterval(fetchAndCheck, 2000000); // every 2000 seconds
     return () => clearInterval(interval);
   }, [thresholds]);
 

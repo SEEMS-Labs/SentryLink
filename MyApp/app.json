@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "SEEMS",
-    "slug": "MyApp",
+    "slug": "SEEMS",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/SEEMS_LOGO.png",
@@ -17,9 +17,9 @@
       [
         "react-native-ble-plx",
         {
-          "bluetoothAlwaysPermission": "We use Bluetooth to connect to your robot.",
-          "bluetoothPermission": "We use Bluetooth to connect to your robot.",
-          "bluetoothAdvertisePermission": "We use Bluetooth to connect to your robot."
+          "bluetoothAlwaysPermission": "We use Bluetooth to connect to seems.",
+          "bluetoothPermission": "We use Bluetooth to connect to seems.",
+          "bluetoothAdvertisePermission": "We use Bluetooth to connect to seems."
         }
       ]
     ],
