@@ -28,14 +28,17 @@ export async function registerForPushNotificationsAsync(message) {
   const token = tokenResponse.data;
   console.log('Expo Push Token:', token);
 
-  // Send push notification
-  if (token) {
+  // ✅ Only send notification if message is valid
+  if (token && message && typeof message === "string" && message.trim() !== "") {
     await Notifications.scheduleNotificationAsync({
       content: {
         title: "Sensor Alert",
-        body: message,  // Message received from the calling function
+        body: message.trim(),
+        sound: "default",
       },
-      trigger: null, // Set to null to trigger immediately
+      trigger: null,
     });
+  } else {
+    console.warn("📭 No valid message provided for push notification.");
   }
 }

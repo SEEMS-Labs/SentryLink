@@ -22,6 +22,7 @@ const LoginScreen = () => {
       
       // Save the login status to AsyncStorage
       await AsyncStorage.setItem('isLoggedIn', 'true');
+      await AsyncStorage.removeItem('pushTokenSent');
     } catch (error) {
       setError(error.message);
     } finally {
@@ -35,6 +36,7 @@ const LoginScreen = () => {
       setError("");
       await createUserWithEmailAndPassword(auth, email, password);
       alert("User created successfully!");
+      await AsyncStorage.removeItem('pushTokenSent'); // Reset push token session
     } catch (error) {
       setError(error.message);
     } finally {

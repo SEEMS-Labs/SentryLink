@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "SEEMS",
-    "slug": "SEEMS",
+    "slug": "MyApp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/SEEMS_LOGO.png",
@@ -54,7 +54,7 @@
       "favicon": "./assets/favicon.png"
     },
     "notification": {
-      "icon": "./assets/images/react-logo.png",
+      "icon": "./assets/Notification-icon.png",
       "iosDisplayInForeground": true,
       "androidMode": "default",
       "androidCollapsedTitle": "Your App Notification"

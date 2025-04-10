@@ -1,21 +1,38 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, StyleSheet, Alert, TouchableOpacity } from "react-native";
 import Slider from "@react-native-community/slider";
 import { database } from "../Firebase/firebaseConfig";
-import { update,ref, get, set } from "firebase/database";
-import { registerForPushNotificationsAsync } from "./NotificationHandler";
+import { ref, get, update } from "firebase/database";
+import { getAuth } from "firebase/auth";
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import Constants from 'expo-constants';
+import { registerForPushNotificationsAsync } from './NotificationHandler';
+import AsyncStorage from '@react-native-async-storage/async-storage';  // Import AsyncStorage
+
 
 const CustomScreen = () => {
-  const [thresholds, setThresholds] = useState({
-    temperature: 65, // Initial threshold set to 75°C for temperature
-    humidity: 60,
-    pressure: 1013,
-    airQuality: 150,
-    noise: 90,
-    presence: "",
-  });
 
-  const [sensorValues, setSensorValues] = useState({
+   useFocusEffect(
+    useCallback(() => {
+      const registerPushToken = async () => {
+        const token = await registerForPushNotificationsAsync();
+        const user = getAuth().currentUser;
+        if (token && user) {
+          const db = getDatabase();
+          const userTokenRef = ref(db, `users/${user.uid}/push_token`);
+          await update(userTokenRef, { push_token: token });
+          console.log("✅ Push token registered for user");
+          console.log("📍 CustomScreen focused. Attempting push registration...");
+          console.log("💾 Saved token to Firebase for user:", user.uid);
+        }
+      };
+
+      registerPushToken();
+    }, [])
+  );
+  const [thresholds, setThresholds] = useState({
     temperature: "",
     humidity: "",
     pressure: "",
@@ -24,9 +41,70 @@ const CustomScreen = () => {
     presence: "",
   });
 
-  // Decodes 8-bit presence value into individual sensor states
-  const decodePresence = (value) => {
-    const bitValue = value & 0xFF;  // Mask to 8 bits (values between 0-255)
+  const [sensorValues, setSensorValues] = useState({
+    temperature: null,
+    humidity: null,
+    pressure: null,
+    airQuality: null,
+    noise: null,
+    presence: null,
+  });
+
+  // Load thresholds from AsyncStorage
+  const loadThresholds = async () => {
+  try {
+    const saved = await AsyncStorage.getItem('thresholds');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Ensure all values are numbers
+      const cleaned = Object.fromEntries(
+        Object.entries(parsed).map(([k, v]) => [k, Number(v)])
+      );
+      setThresholds(cleaned);
+      console.log(" Loaded thresholds from storage:", cleaned);
+    } else {
+      console.log(" No thresholds found in AsyncStorage");
+    }
+  } catch (error) {
+    console.log(" Error loading thresholds", error);
+  }
+};
+
+  // Save thresholds to AsyncStorage
+  const saveThresholds = async () => {
+    try {
+      await AsyncStorage.setItem('thresholds', JSON.stringify(thresholds));  // Save current thresholds
+      console.log("Thresholds saved:", thresholds);
+    } catch (error) {
+      console.log("Error saving thresholds", error);
+    }
+  };
+
+  // Run loadThresholds when the component mounts
+  useEffect(() => {
+    loadThresholds();  // Load thresholds when app starts
+  }, []);
+
+  // Call saveThresholds whenever the thresholds change
+  useEffect(() => {
+  const timeout = setTimeout(() => {
+    const isValid = Object.values(thresholds).every(val => typeof val === 'number' && !isNaN(val));
+    if (isValid) {
+      console.log("💾 Thresholds saved:", thresholds);
+      saveThresholds();
+    } else {
+      console.log("⏸ Not saving thresholds. Invalid state:", thresholds);
+    }
+  }, 500); // debounce by 500ms
+
+  return () => clearTimeout(timeout);
+}, [thresholds]);
+
+
+  const decodePresence = (value, alertMessages) => {
+    // Assuming presence value is a bitmask or a set of states represented by a number
+    const bitValue = value & 0xFF;
+
     const sensorStates = {
       right: (bitValue & 0b11),
       left: ((bitValue >> 2) & 0b11),
@@ -38,127 +116,162 @@ const CustomScreen = () => {
     console.log("Raw presence value (in decimal): ", value);
     console.log("Raw presence value (in binary): ", value.toString(2).padStart(8, "0"));
 
-    Object.entries(sensorStates).forEach(([sensor, state]) => {
+    // Checking the presence states and pushing alerts based on them
+    for (const [sensor, state] of Object.entries(sensorStates)) {
+      const messageBase = `${capitalize(sensor)} Sensor Alert`;
       switch (state) {
         case 0:
-          console.log(`${capitalize(sensor)}: No presence detected`);
+          console.log(`${messageBase}: No presence detected`);
           break;
         case 1:
-          console.log(`${capitalize(sensor)}: Weak presence detected`);
-          Alert.alert(`${capitalize(sensor)} Sensor Alert`, `${capitalize(sensor)} weak presence detected.`);
-          registerForPushNotificationsAsync(`${capitalize(sensor)} weak presence detected.`);
+          const msg1 = `⚠️ ${messageBase}: Weak presence detected.`;
+          console.log(msg1);
+          alertMessages.push(msg1);
           break;
         case 2:
-          console.log(`${capitalize(sensor)}: Presence certain, motion possible`);
-          Alert.alert(`${capitalize(sensor)} Sensor Alert`, `${capitalize(sensor)} presence certain, motion possible.`);
-          registerForPushNotificationsAsync(`${capitalize(sensor)} presence certain, motion possible.`);
+          const msg2 = `⚠️ ${messageBase}: Moderate motion possible.`;
+          console.log(msg2);
+          alertMessages.push(msg2);
           break;
         case 3:
-          console.log(`${capitalize(sensor)}: Strong motion detected`);
-          Alert.alert(`${capitalize(sensor)} Sensor Alert`, `${capitalize(sensor)} strong motion detected.`);
-          registerForPushNotificationsAsync(`${capitalize(sensor)} strong motion detected.`);
+          const msg3 = `⚠️ ${messageBase}: Strong motion detected.`;
+          console.log(msg3);
+          alertMessages.push(msg3);
           break;
         default:
           break;
       }
-    });
+    }
   };
 
- const sendThresholdsToFirebase = () => {
-    // Log initial thresholds to verify what we're starting with
-    console.log("Initial thresholds:", thresholds);
-
-    // Apply bitwise mask and shift each value into its correct 64-bit position
-    const temperatureThreshold = thresholds.temperature & 0x7F; // Masking 7 bits
-    const humidityThreshold = thresholds.humidity & 0x1FF;   // Masking 9 bits
-    const noiseThreshold = thresholds.noise & 0xFF;           // Masking 8 bits
-    const presenceThreshold = thresholds.presence & 0x1FF;    // Masking 9 bits
-    const airQualityThreshold = thresholds.airQuality & 0x1FF; // Masking 9 bits
-    const pressureThreshold = thresholds.pressure & 0x7FF;    // Masking 11 bits
-
-    // Shift each threshold into its correct position in the 64-bit value
-    const combinedThresholds = 
-        (temperatureThreshold << 0) |   // Shift temperature threshold (7 bits) into the lower bits
-        (humidityThreshold << 7) |      // Shift humidity threshold (7 bits) into the next position
-        (noiseThreshold << 14) |        // Shift noise threshold (7 bits) into the next position
-        (presenceThreshold << 21) |     // Shift presence threshold (9 bits) into the next position
-        (airQualityThreshold << 30) |   // Shift air quality threshold (9 bits) into the next position
-        (pressureThreshold << 39);      // Shift pressure threshold (11 bits) into the next position
-
-    // Log the combined 64-bit value to verify
-    console.log("Combined Thresholds (64-bit):", combinedThresholds);
-
-    // Send the combined 64-bit value to Firebase
-    const thresholdsRef = ref(database, '/sentrylink/');
-    update(thresholdsRef, {
-        user_config: combinedThresholds,  // Send as a single 64-bit value
-    }).then(() => {
-        console.log("Thresholds successfully updated in Firebase");
-    }).catch((error) => {
-        console.error("Error sending thresholds to Firebase:", error);
-    });
-  };
-  
   const fetchAndCheck = async () => {
+    const user = getAuth().currentUser;
+    if (!user) {
+      console.log("🚫 User not logged in, skipping fetchAndCheck");
+      return;
+    }
+
+    const thresholdsReady = Object.values(thresholds).every(
+    (v) => typeof v === 'number' && !isNaN(v)
+  );
+  if (!thresholdsReady) {
+    console.log("⏸ Thresholds not ready yet, skipping fetchAndCheck.");
+    return;
+    }
+    
+    console.log("🔄 Running fetchAndCheck...");
+
+    let alertMessages = [];
+
     try {
-      const paths = ["temperature", "humidity", "pressure", "airQuality", "noise", "presence"];
-      const newValues = { ...sensorValues };
+      const paths = ["temperature", "humidity", "pressure", "airQuality", "noise"];
+      const newValues = {};
 
       for (const key of paths) {
         const snap = await get(ref(database, `/sentry/readings/${key}`));
-        if (snap.exists()) {
-          newValues[key] = snap.val();
+        newValues[key] = snap.exists() ? snap.val() : null;
+      }
+
+      const noiseSnap = await get(ref(database, `/sentry/readings/noise`));
+      if (noiseSnap.exists()) {
+        newValues.noise = noiseSnap.val();
+        if (newValues.noise > thresholds.noise) {
+          alertMessages.push(`⚠️ Noise exceeds threshold: ${newValues.noise} dB`);
         }
+      }
+
+      const noiseStateSnap = await get(ref(database, `/sentry/alerts/noise`));
+      if (noiseStateSnap.exists()) {
+        const noiseState = noiseStateSnap.val();
+        const noiseMsgs = [
+          null,
+          "⚠️ Noise: Weak spike above threshold",
+          "⚠️ Noise: Moderate spike above threshold",
+          "⚠️ Noise: Strong spike above threshold",
+        ];
+        if (noiseMsgs[noiseState]) alertMessages.push(noiseMsgs[noiseState]);
+      }
+
+      const presenceSnap = await get(ref(database, `/sentry/alerts/presence`));
+      if (presenceSnap.exists()) {
+        newValues.presence = presenceSnap.val();
+        decodePresence(newValues.presence, alertMessages);
       }
 
       setSensorValues(newValues);
 
-      if (newValues.presence !== undefined) {
-        decodePresence(newValues.presence);
-      }
-
-      // Debug: Log the fetched values
-      console.log("Fetched sensor values: ", newValues);
-
-      // Check if any value exceeds its threshold
-      Object.entries(newValues).forEach(([key, value]) => {
-        if (key !== "presence" && value > thresholds[key]) {
-          Alert.alert(`${capitalize(key)} Alert`, `${capitalize(key)} exceeds threshold: ${value}`);
-          registerForPushNotificationsAsync(`${capitalize(key)} exceeds threshold: ${value}`);
+      const thresholdsData = {};
+      ["temperature", "humidity", "pressure", "airQuality"].forEach(sensor => {
+        if (newValues[sensor] !== null) {
+          const isAbove = newValues[sensor] > thresholds[sensor];
+          thresholdsData[sensor] = isAbove;
+          if (isAbove) alertMessages.push(`⚠️ ${capitalize(sensor)} exceeds threshold: ${newValues[sensor]}`);
         }
       });
 
-      // Send thresholds to Firebase
-      sendThresholdsToFirebase();
+      await update(ref(database, '/sentry/alerts'), {
+        temperature: thresholdsData.temperature || false,
+        humidity: thresholdsData.humidity || false,
+        pressure: thresholdsData.pressure || false,
+        airQuality: thresholdsData.airQuality || false,
+      });
 
+      console.log("🚨 FINAL ALERT MESSAGES:", alertMessages);
+      const fullMessage = alertMessages.filter(msg => !!msg).join("\n");
+      console.log("🧾 COMPILED MESSAGE:", fullMessage);
+      if (alertMessages.length > 0) {
+        Alert.alert("Sensor Alerts", fullMessage);
+        try {
+          const wasNotified = await AsyncStorage.getItem('pushTokenSent');
+          if (!wasNotified) {
+            if (fullMessage && fullMessage.trim() !== "") {
+        await registerForPushNotificationsAsync(fullMessage);
+            console.log("📨 Push notification sent with message:", fullMessage);}
+            await AsyncStorage.setItem('pushTokenSent', 'true');
+          } else {
+            console.log("📨 Push token already registered this session.");
+          }
+        } catch (err) {
+          console.warn("⚠️ Failed to manage push token session flag:", err);
+        }
+      }
     } catch (error) {
-      console.error("Error fetching sensor data:", error);
+      console.error("❌ Error fetching sensor data:", error);
     }
   };
 
   useEffect(() => {
-    const interval = setInterval(fetchAndCheck, 2000000); // every 2000 seconds
-    return () => clearInterval(interval);
-  }, [thresholds]);
+  const thresholdsReady = Object.values(thresholds).every(
+    (v) => typeof v === 'number' && !isNaN(v)
+  );
+
+  if (!thresholdsReady) return;
+
+  const interval = setInterval(() => {
+    fetchAndCheck();
+  }, 20000);
+
+  return () => clearInterval(interval);
+}, [thresholds]);
 
   const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
   const renderSensor = (label, unit, min, max, color) => {
-    const value = sensorValues[label];
+    const value = sensorValues[label]; // Use sensorValues here
     const threshold = thresholds[label];
     return (
       <View style={styles.sensorContainer}>
         <Text style={styles.sensorLabel}>
-          {capitalize(label)}: {value != null ? `${label === "temperature" ? Math.round(value * (9/5) + 32) : value} ${unit}` : "Loading..."}
+          {capitalize(label)}: {value != null ? `${label === "temperature" ? Math.round(value * (9 / 5) + 32) : value} ${unit}` : "Loading..."}
         </Text>
         <Text style={styles.sensorLabel}>
-          Threshold: {label === "temperature" ? Math.round(threshold * (9/5) + 32) : threshold} {unit}
+          Threshold: {label === "temperature" ? Math.round(threshold * (9 / 5) + 32) : threshold} {unit}
         </Text>
         <Slider
           style={styles.slider}
           minimumValue={min}
           maximumValue={max}
-          value={threshold}
+          value={Number(threshold) || 0}
           onValueChange={(val) =>
             setThresholds((prev) => ({
               ...prev,

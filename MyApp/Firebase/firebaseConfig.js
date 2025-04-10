@@ -16,26 +16,17 @@ const firebaseConfig = {
   appId: "1:364476906922:web:7dc0d8f58d34354d67bfd3"
 };
 
-// Initialize Firebase only if not already initialized
-let app;
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp(); // Use the existing Firebase app
-}
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Firebase Authentication with persistence
+// ✅ Initialize auth with persistence ONLY if not already initialized
 let auth;
 try {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+  });
+} catch (e) {
+  // Fallback to getAuth if already initialized
   auth = getAuth(app);
-} catch (error) {
-  if (error.code === 'auth/already-initialized') {
-    auth = initializeAuth(app, {
-      persistence: getReactNativePersistence(ReactNativeAsyncStorage),
-    });
-  } else {
-    throw error;
-  }
 }
 
 // Initialize Firebase Realtime Database

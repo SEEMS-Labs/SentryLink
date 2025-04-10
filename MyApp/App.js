@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Alert, PermissionsAndroid, Platform } from "react-native";
+import { Alert, PermissionsAndroid, Platform, ActivityIndicator, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -9,7 +9,9 @@ import { onAuthStateChanged, signOut, getAuth } from "firebase/auth";
 import { getDatabase, ref, set } from "firebase/database";
 import { auth } from './Firebase/firebaseConfig';
 import { registerForPushNotificationsAsync } from './screens/NotificationHandler';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Screens
 import LoginScreen from "./screens/authen";
 import HomeScreen from "./screens/home";
 import CameraScreen from "./screens/Cam";
@@ -19,7 +21,6 @@ import WiFiSetup from "./screens/WiFiSetup";
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// BLE Permission request for Android 12+
 const requestBluetoothPermissions = async () => {
   if (Platform.OS === 'android' && Platform.Version >= 31) {
     try {
@@ -63,56 +64,78 @@ function MyTabs() {
 export default function App() {
   const [user, setUser] = useState(null);
   const [skipWiFi, setSkipWiFi] = useState(false);
+  const [isCheckingWiFi, setIsCheckingWiFi] = useState(true);
 
   useEffect(() => {
-    requestBluetoothPermissions();
+  requestBluetoothPermissions();
 
-    // Register for push notifications and handle token
-    registerForPushNotificationsAsync().then(token => {
-      if (token && user) {
-        const db = getDatabase();
-        const userTokenRef = ref(db, `users/${user.uid}/push_token`);
-        set(userTokenRef, token)
-          .then(() => console.log("Push notification token saved in database"))
-          .catch((error) => console.error("Error saving token:", error));
+  const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+    console.log("Notification received in foreground:", notification);
+    Alert.alert(notification.request.content.title, notification.request.content.body);
+  });
+
+  const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+    console.log("User interacted with notification:", response);
+  });
+
+  const checkStoredWiFi = async (uid) => {
+    try {
+      const savedSSID = await AsyncStorage.getItem(`wifi_ssid_${uid}`);
+      if (savedSSID) {
+        setSkipWiFi(true);
       }
-    });
+    } catch (error) {
+      console.error("Error reading saved Wi-Fi:", error);
+    } finally {
+      setIsCheckingWiFi(false);
+    }
+  };
 
-    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
-      console.log("Notification received in foreground:", notification);
-      Alert.alert(notification.request.content.title, notification.request.content.body);
-    });
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    console.log("User: ", user);
+    setUser(user);
 
-    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log("User interacted with notification:", response);
-    });
+    const db = getDatabase();
+    const userStatusRef = ref(db, "sentrylink/user_in_app");
+    set(userStatusRef, user ? true : false)
+      .then(() => console.log("User in app status updated"))
+      .catch((error) => console.error("Error updating user status:", error));
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log("User: ", user);
-      setUser(user);
-      const db = getDatabase();
-      const userStatusRef = ref(db, "sentrylink/user_in_app");
-      set(userStatusRef, user ? true : false)
-        .then(() => console.log("User in app status updated"))
-        .catch((error) => console.error("Error updating user status:", error));
-    });
+    if (user) {
+      checkStoredWiFi(user.uid);
+    } else {
+      setIsCheckingWiFi(false);
+    }
+  });
 
-    return () => {
-      unsubscribe();
-      Notifications.removeNotificationSubscription(notificationListener);
-      Notifications.removeNotificationSubscription(responseListener);
-    };
-  }, [user]);
+  return () => {
+    unsubscribe();
+    Notifications.removeNotificationSubscription(notificationListener);
+    Notifications.removeNotificationSubscription(responseListener);
+  };
+}, [user]);
 
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login">
-        {!user ? (
-          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-        ) : (
-          <Stack.Screen name="Inside" component={MyTabs} options={{ headerShown: false }} />
+  <Stack.Navigator>
+    {isCheckingWiFi ? (
+      <Stack.Screen name="Loading" options={{ headerShown: false }}>
+        {() => (
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#2c3338" }}>
+            <ActivityIndicator size="large" color="#C57B57" />
+          </View>
         )}
-      </Stack.Navigator>
-    </NavigationContainer>
+      </Stack.Screen>
+    ) : !user ? (
+      <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+    ) : !skipWiFi ? (
+      <Stack.Screen name="WiFiSetup">
+        {(props) => <WiFiSetup {...props} setSkipWiFi={setSkipWiFi} />}
+      </Stack.Screen>
+    ) : (
+      <Stack.Screen name="Inside" component={MyTabs} options={{ headerShown: false }} />
+    )}
+  </Stack.Navigator>
+</NavigationContainer>
   );
 }
