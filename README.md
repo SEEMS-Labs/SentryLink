@@ -1,5 +1,3 @@
-my name is jovani jorjo but everybody calls me giorgio
-
 To install:
 
 1- Vscode download
@@ -10,4 +8,19 @@ To install:
 
 4- npx expo to run the server
 
-5- Open the app or Use a usb to conenct
+5- Open the app or Use a usb to connect
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+my name is jovani jorjo but everybody calls me giorgio
