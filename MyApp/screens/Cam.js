@@ -1,80 +1,105 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { database } from "../Firebase/firebaseConfig";
 import { ref, onValue, off } from 'firebase/database';
 import { Ionicons } from '@expo/vector-icons';
 
-const parseControllerData = (rawData) => {
-  return {
-    controllerOn: (rawData & 0b1) === 1,
-    controlMode: (rawData >> 1) & 0b11,
-    dpadDirection: (rawData >> 3) & 0b11,
-    joystickX: (rawData >> 5) & 0x3FF,
-    joystickY: (rawData >> 15) & 0x3FF,
-  };
-};
+const parseControllerData = (rawData) => ({
+  controllerOn: (rawData & 0b1) === 1,
+  controlMode: (rawData >> 1) & 0b11,
+  dpadDirection: (rawData >> 3) & 0b11,
+  joystickX: (rawData >> 5) & 0x3FF,
+  joystickY: (rawData >> 15) & 0x3FF,
+});
 
 const CamScreen = () => {
   const [isStreaming, setIsStreaming] = useState(false);
-  const [fps, setFps] = useState("");
+  const [fps, setFps] = useState(0);
   const [motorState, setMotorState] = useState(null);
   const [manualControlEnabled, setManualControlEnabled] = useState(false);
 
-  const streamUrl = 'http://192.168.1.149';
-
-  const fetchFps = async () => {
-    try {
-      const response = await fetch('http://192.168.1.149/fps');
-      const text = await response.text();
-      setFps(text);
-    } catch (error) {
-      console.error('Failed to fetch FPS:', error);
-      setFps('N/A');
-    }
-  };
-
-  useEffect(() => {
-    if (isStreaming) {
-      const interval = setInterval(fetchFps, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [isStreaming]);
+  const streamUrl = 'http://192.168.1.149/capture';
 
   useEffect(() => {
     const motorRef = ref(database, 'sentrylink/motor');
-
     const unsubscribe = onValue(motorRef, (snapshot) => {
       const data = snapshot.val();
-      console.log('Received Data from Firebase:', data);
       const parsed = parseControllerData(data);
-      console.log('Parsed Data:', parsed);
       setMotorState(parsed);
     });
-
-    // Cleanup when the component is unmounted
-    return () => {
-      off(motorRef, 'value', unsubscribe);
-    };
+    return () => off(motorRef, 'value', unsubscribe);
   }, []);
 
   const handleDirection = (direction) => {
     if (!manualControlEnabled) return;
     console.log(`Direction: ${direction}`);
-    // TODO: Send control command to Firebase here
+    // TODO: Send control command to Firebase
   };
+
+  const handleWebViewMessage = (event) => {
+    const value = parseInt(event.nativeEvent.data);
+    if (!isNaN(value)) setFps(value);
+  };
+
+  const getWebViewContent = () => `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          html, body {
+            margin: 0;
+            padding: 0;
+            background: black;
+            overflow: hidden;
+            height: 100%;
+          }
+          #cam {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+          }
+        </style>
+      </head>
+      <body>
+        <img id="cam" src="" />
+<script>
+  const img = document.getElementById('cam');
+  let count = 0;
+  let start = Date.now();
+
+  function update() {
+    img.src = '${streamUrl}?t=' + new Date().getTime();
+  }
+
+  img.onload = () => {
+    count++;
+    const now = Date.now();
+    if (now - start >= 1000) {
+      window.ReactNativeWebView.postMessage(count.toString());
+      count = 0;
+      start = now;
+    }
+    setTimeout(update, 0.1); // try 100 or 80 if it's flickering
+  };
+
+  update();
+</script>
+      </body>
+    </html>
+  `;
 
   return (
     <View style={{ flex: 1 }}>
       {isStreaming && (
-        <View style={{ flex: 1, marginTop: 20 }}>
+        <View style={{ height: 300, width: '100%' }}>
           <WebView
             originWhitelist={['*']}
-            source={{ uri: streamUrl }}
-            style={{ flex: 1 }}
+            source={{ html: getWebViewContent() }}
+            onMessage={handleWebViewMessage}
             javaScriptEnabled={true}
-            onError={(error) => console.error('WebView error:', error)}
-            onHttpError={(error) => console.error('HTTP error:', error)}
+            style={{ flex: 1 }}
           />
         </View>
       )}
@@ -94,32 +119,20 @@ const CamScreen = () => {
 
         <View style={styles.directionButtonsContainer}>
           <View style={styles.row}>
-            <TouchableOpacity
-              style={styles.directionButton}
-              onPress={() => handleDirection('UP')}
-            >
+            <TouchableOpacity style={styles.directionButton} onPress={() => handleDirection('UP')}>
               <Ionicons name="arrow-up" size={24} color="white" />
             </TouchableOpacity>
           </View>
           <View style={styles.row}>
-            <TouchableOpacity
-              style={styles.directionButton}
-              onPress={() => handleDirection('LEFT')}
-            >
+            <TouchableOpacity style={styles.directionButton} onPress={() => handleDirection('LEFT')}>
               <Ionicons name="arrow-back" size={24} color="white" />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.directionButton}
-              onPress={() => handleDirection('RIGHT')}
-            >
+            <TouchableOpacity style={styles.directionButton} onPress={() => handleDirection('RIGHT')}>
               <Ionicons name="arrow-forward" size={24} color="white" />
             </TouchableOpacity>
           </View>
           <View style={styles.row}>
-            <TouchableOpacity
-              style={styles.directionButton}
-              onPress={() => handleDirection('DOWN')}
-            >
+            <TouchableOpacity style={styles.directionButton} onPress={() => handleDirection('DOWN')}>
               <Ionicons name="arrow-down" size={24} color="white" />
             </TouchableOpacity>
           </View>
@@ -150,6 +163,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  fpsText: {
+    color: 'white',
+    fontSize: 18,
+    marginBottom: 10,
   },
   button: {
     padding: 10,
