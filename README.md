@@ -2,7 +2,9 @@ To install:
 
 1- Vscode download
 
-2- open to Myapps directory
+2-Clone the repo with desktop github
+
+2- Open to Myapps directory
 
 3-do npm install
 
