@@ -28,8 +28,8 @@ export async function registerForPushNotificationsAsync(message) {
   const token = tokenResponse.data;
   console.log('Expo Push Token:', token);
 
-  // ✅ Only send notification if message is valid
-  if (token && message && typeof message === "string" && message.trim() !== "") {
+  // Only send notification if message is valid
+  if (token && message) {
     await Notifications.scheduleNotificationAsync({
       content: {
         title: "Sensor Alert",
@@ -38,7 +38,10 @@ export async function registerForPushNotificationsAsync(message) {
       },
       trigger: null,
     });
-  } else {
-    console.warn("📭 No valid message provided for push notification.");
+  } else if (token) {
+      console.warn(" No valid message provided for push notification.");
+    }
+    else{
+      console.warn(" No valid token provided for push notification.");
+    }
   }
-}

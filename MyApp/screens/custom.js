@@ -12,26 +12,28 @@ import { registerForPushNotificationsAsync } from './NotificationHandler';
 import AsyncStorage from '@react-native-async-storage/async-storage';  // Import AsyncStorage
 
 
+//line283 for demo 
 const CustomScreen = () => {
 
-   useFocusEffect(
-    useCallback(() => {
-      const registerPushToken = async () => {
-        const token = await registerForPushNotificationsAsync();
-        const user = getAuth().currentUser;
-        if (token && user) {
-          const db = getDatabase();
-          const userTokenRef = ref(db, `users/${user.uid}/push_token`);
-          await update(userTokenRef, { push_token: token });
-          console.log("✅ Push token registered for user");
-          console.log("📍 CustomScreen focused. Attempting push registration...");
-          console.log("💾 Saved token to Firebase for user:", user.uid);
-        }
-      };
+  //  useFocusEffect(
+  //   useCallback(() => {
+  //     const registerPushToken = async () => {
+  //       const token = await registerForPushNotificationsAsync();
+  //       const user = getAuth().currentUser;
+  //       if (token && user) {
+  //         const db = getDatabase();
+  //         const userTokenRef = ref(db, `users/${user.uid}/push_token`);
+  //         await update(userTokenRef, { push_token: token });
+  //         console.log(" Push token registered for user");
+  //         console.log(" CustomScreen focused. Attempting push registration...");
+  //         console.log(" Saved token to Firebase for user:", user.uid);
+  //       }
+  //     };
 
-      registerPushToken();
-    }, [])
-  );
+  //     registerPushToken();
+  //   }, [])
+  // );
+  
   const [thresholds, setThresholds] = useState({
     temperature: "",
     humidity: "",
@@ -74,7 +76,6 @@ const CustomScreen = () => {
   const saveThresholds = async () => {
     try {
       await AsyncStorage.setItem('thresholds', JSON.stringify(thresholds));  // Save current thresholds
-      console.log("Thresholds saved:", thresholds);
     } catch (error) {
       console.log("Error saving thresholds", error);
     }
@@ -82,7 +83,10 @@ const CustomScreen = () => {
 
   // Run loadThresholds when the component mounts
   useEffect(() => {
+    const timeout = setTimeout(() => {
     loadThresholds();  // Load thresholds when app starts
+  }, 1000); // debounce by 1000ms
+    return () => clearTimeout(timeout);
   }, []);
 
   // Call saveThresholds whenever the thresholds change
@@ -90,12 +94,12 @@ const CustomScreen = () => {
   const timeout = setTimeout(() => {
     const isValid = Object.values(thresholds).every(val => typeof val === 'number' && !isNaN(val));
     if (isValid) {
-      console.log("💾 Thresholds saved:", thresholds);
+      console.log(" Thresholds saved:", thresholds);
       saveThresholds();
     } else {
       console.log("⏸ Not saving thresholds. Invalid state:", thresholds);
     }
-  }, 500); // debounce by 500ms
+  }, 2000); // debounce by 2000ms
 
   return () => clearTimeout(timeout);
 }, [thresholds]);
@@ -181,16 +185,20 @@ const CustomScreen = () => {
       }
 
       const noiseStateSnap = await get(ref(database, `/sentry/alerts/noise`));
-      if (noiseStateSnap.exists()) {
-        const noiseState = noiseStateSnap.val();
-        const noiseMsgs = [
-          null,
-          "⚠️ Noise: Weak spike above threshold",
-          "⚠️ Noise: Moderate spike above threshold",
-          "⚠️ Noise: Strong spike above threshold",
-        ];
-        if (noiseMsgs[noiseState]) alertMessages.push(noiseMsgs[noiseState]);
-      }
+if (noiseStateSnap.exists()) {
+  const noiseState = noiseStateSnap.val();
+  const noiseMsgs = [
+    null,
+    "⚠️ Noise: Weak spike above threshold",
+    "⚠️ Noise: Moderate spike above threshold",
+    "⚠️ Noise: Strong spike above threshold",
+  ];
+
+  // ✅ Only show alert if noiseState is 2 or 3
+  if (noiseState >= 2 && noiseMsgs[noiseState]) {
+    alertMessages.push(noiseMsgs[noiseState]);
+  }
+} 
 
       const presenceSnap = await get(ref(database, `/sentry/alerts/presence`));
       if (presenceSnap.exists()) {
@@ -199,7 +207,15 @@ const CustomScreen = () => {
       }
 
       setSensorValues(newValues);
+      // Check Firebase alert states directly
+      const alertStatesSnap = await get(ref(database, '/sentry/alerts'));
+      if (alertStatesSnap.exists()) {
+        const alertStates = alertStatesSnap.val();
+        const alertMessagesFromFirebase = [];
 
+        
+
+       // Used to local check, now check firebase directly
       const thresholdsData = {};
       ["temperature", "humidity", "pressure", "airQuality"].forEach(sensor => {
         if (newValues[sensor] !== null) {
@@ -214,31 +230,49 @@ const CustomScreen = () => {
         humidity: thresholdsData.humidity || false,
         pressure: thresholdsData.pressure || false,
         airQuality: thresholdsData.airQuality || false,
+        
       });
-
-      console.log("🚨 FINAL ALERT MESSAGES:", alertMessages);
+      console.log("Updated Firebase with alert states:", thresholdsData);
+      console.log(" FINAL ALERT MESSAGES:", alertMessages);
       const fullMessage = alertMessages.filter(msg => !!msg).join("\n");
-      console.log("🧾 COMPILED MESSAGE:", fullMessage);
+      console.log(" COMPILED MESSAGE:", fullMessage);
+
       if (alertMessages.length > 0) {
-        Alert.alert("Sensor Alerts", fullMessage);
-        try {
-          const wasNotified = await AsyncStorage.getItem('pushTokenSent');
-          if (!wasNotified) {
-            if (fullMessage && fullMessage.trim() !== "") {
-        await registerForPushNotificationsAsync(fullMessage);
-            console.log("📨 Push notification sent with message:", fullMessage);}
-            await AsyncStorage.setItem('pushTokenSent', 'true');
-          } else {
-            console.log("📨 Push token already registered this session.");
+        if (!global.alertShown) {
+          global.alertShown = true; // Set the flag to true when alert is shown
+          Alert.alert("Sensor Alerts", fullMessage, [
+            {
+              text: "OK",
+              onPress: () => {
+                global.alertShown = false; // Reset the flag when "OK" is pressed
+              },
+            },
+          ]);
+          setTimeout(() => {
+            global.alertShown = false; // Reset the flag after a delay
+          }, 20000); // 20 seconds delay
+      
+          try {
+            const wasNotified = await AsyncStorage.getItem('pushTokenSent');
+            if (!wasNotified) {
+              if (fullMessage && fullMessage.trim() !== "") {
+                await registerForPushNotificationsAsync(fullMessage);
+                console.log(" Push notification sent with message:", fullMessage);
+              }
+              await AsyncStorage.setItem('pushTokenSent', 'true');
+            } else {
+              console.log(" Push token already registered this session.");
+            }
+          } catch (err) {
+            console.warn(" Failed to manage push token session flag:", err);
           }
-        } catch (err) {
-          console.warn("⚠️ Failed to manage push token session flag:", err);
         }
       }
-    } catch (error) {
-      console.error("❌ Error fetching sensor data:", error);
     }
-  };
+  } catch (error) {
+    console.error("❌ Error during fetchAndCheck:", error);
+  }
+};
 
   useEffect(() => {
   const thresholdsReady = Object.values(thresholds).every(
@@ -249,7 +283,7 @@ const CustomScreen = () => {
 
   const interval = setInterval(() => {
     fetchAndCheck();
-  }, 20000);
+  }, 200000); // 200 seconds
 
   return () => clearInterval(interval);
 }, [thresholds]);
@@ -290,13 +324,13 @@ const CustomScreen = () => {
     <View style={styles.container}>
       <Text style={styles.header}>Custom Sensor Settings</Text>
 
-      {renderSensor("temperature", "°F", 30, 70, "red")}
+      {renderSensor("temperature", "°F", -40, 70, "red")}
       {renderSensor("humidity", "%", 0, 100, "#00BFFF")}
       {renderSensor("pressure", "hPa", 300, 1300, "grey")}
       {renderSensor("airQuality", "AQI", 50, 500, "#32CD32")}
-      {renderSensor("noise", "dB", 80, 120, "yellow")}
+      {renderSensor("noise", "dB", 70, 120, "yellow")}
 
-      <TouchableOpacity style={styles.button} onPress={fetchAndCheck}>
+      <TouchableOpacity style={styles.button} onPress={() => { global.alertShown = false; fetchAndCheck(); }}>
         <Text style={styles.buttonText}>Manual Check Now</Text>
       </TouchableOpacity>
     </View>

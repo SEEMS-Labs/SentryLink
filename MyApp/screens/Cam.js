@@ -2,16 +2,35 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { database } from "../Firebase/firebaseConfig";
-import { ref, onValue, off } from 'firebase/database';
+import { ref, onValue, off, update } from 'firebase/database';
 import { Ionicons } from '@expo/vector-icons';
 
-const parseControllerData = (rawData) => ({
-  controllerOn: (rawData & 0b1) === 1,
-  controlMode: (rawData >> 1) & 0b11,
-  dpadDirection: (rawData >> 3) & 0b11,
-  joystickX: (rawData >> 5) & 0x3FF,
-  joystickY: (rawData >> 15) & 0x3FF,
-});
+const parseControllerData = (rawData) => {
+  return {
+    controllerOn: rawData & 0b1, // Extract the first bit (controller on/off)
+    controlMode: (rawData >> 1) & 0b11, // Extract bits [1, 2] (control mode)
+    dpadDirection: (rawData >> 3) & 0b11, // Extract bits [3, 4] (dpad direction)
+    joystickX: (rawData >> 5) & 0x3FF, // Extract bits [5-14] (joystick X position)
+    joystickY: (rawData >> 15) & 0x3FF, // Extract bits [15-24] (joystick Y position)
+  };
+};
+
+const reconvertControllerData = (data) => {
+  let rawData = 0;
+  rawData |= (data.controllerOn & 0b1); // Set the first bit
+  rawData |= (data.controlMode & 0b11) << 1; // Set bits [1, 2]
+  rawData |= (data.dpadDirection & 0b11) << 3; // Set bits [3, 4]
+  rawData |= (data.joystickX & 0x3FF) << 5; // Set bits [5-14]
+  rawData |= (data.joystickY & 0x3FF) << 15; // Set bits [15-24]
+  return rawData;
+};
+
+
+const sendControllerData = async () => {
+  await update(ref(database, 'sentrylink'), {
+    controller: reconvertControllerData,
+  });
+};
 
 const CamScreen = () => {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -19,22 +38,40 @@ const CamScreen = () => {
   const [motorState, setMotorState] = useState(null);
   const [manualControlEnabled, setManualControlEnabled] = useState(false);
 
-  const streamUrl = 'http://192.168.1.149/capture';
+  const streamUrl = 'http://192.168.137.7/capture';
 
   useEffect(() => {
-    const motorRef = ref(database, 'sentrylink/motor');
+     const direction = (dir) => {
+       if (!manualControlEnabled) return;
+       direction = dir; // Update direction when manual control is enabled
+     }; // Properly close the function block
+    const motorRef = ref(database, 'sentrylink/controller');
     const unsubscribe = onValue(motorRef, (snapshot) => {
-      const data = snapshot.val();
-      const parsed = parseControllerData(data);
-      setMotorState(parsed);
+      const rawData = snapshot.val();
+      const parsedData = parseControllerData(rawData);
+      console.log('Motor state:', parsedData);
+      setMotorState(parsedData);
     });
-    return () => off(motorRef, 'value', unsubscribe);
-  }, []);
 
+    // const intervalId = setInterval(() => {
+    //   console.log('Motor state (every 10 sec):', motorState);
+    // }, 10000);
+
+    return () => {
+      off(motorRef, 'value', unsubscribe);
+      clearInterval(intervalId);
+    };
+  }, []);
+    
   const handleDirection = (direction) => {
     if (!manualControlEnabled) return;
     console.log(`Direction: ${direction}`);
-    // TODO: Send control command to Firebase
+    const updateControllerData = (updatedData) => {
+      const rawData = reconvertControllerData(updatedData);
+      update(ref(database, 'sentrylink'), { controller: rawData })
+      .then(() => console.log(`Direction ${direction} sent to Firebase`))
+      .catch((error) => console.error('Error updating direction:', error));
+    }
   };
 
   const handleWebViewMessage = (event) => {
@@ -81,7 +118,7 @@ const CamScreen = () => {
       count = 0;
       start = now;
     }
-    setTimeout(update, 0.1); // try 100 or 80 if it's flickering
+    setTimeout(update, 0.1); // timer for 0.1ms
   };
 
   update();
@@ -93,7 +130,7 @@ const CamScreen = () => {
   return (
     <View style={{ flex: 1 }}>
       {isStreaming && (
-        <View style={{ height: 300, width: '100%' }}>
+        <View style={{ height: 305, width: '100%' }}>
           <WebView
             originWhitelist={['*']}
             source={{ html: getWebViewContent() }}
