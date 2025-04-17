@@ -8,8 +8,8 @@ import * as Notifications from 'expo-notifications';
 import { onAuthStateChanged, signOut, getAuth } from "firebase/auth";
 import { getDatabase, ref, set } from "firebase/database";
 import { auth } from './Firebase/firebaseConfig';
-import { registerForPushNotificationsAsync } from './screens/NotificationHandler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+//import * as Updates from 'expo-updates';
 
 // Screens
 import LoginScreen from "./screens/authen";
@@ -17,29 +17,10 @@ import HomeScreen from "./screens/home";
 import CameraScreen from "./screens/Cam";
 import CustomScreen from './screens/custom';
 import WiFiSetup from "./screens/WiFiSetup";
+import { registerPushToken } from './screens/NotificationHandler';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
-
-const requestBluetoothPermissions = async () => {
-  if (Platform.OS === 'android' && Platform.Version >= 31) {
-    try {
-      const granted = await PermissionsAndroid.requestMultiple([
-        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-      ]);
-      const allGranted = Object.values(granted).every(
-        value => value === PermissionsAndroid.RESULTS.GRANTED
-      );
-      if (!allGranted) {
-        console.warn("Not all Bluetooth permissions granted");
-      }
-    } catch (err) {
-      console.warn("Permission error:", err);
-    }
-  }
-};
 
 function MyTabs() {
   const handleLogout = async () => {
@@ -66,54 +47,94 @@ export default function App() {
   const [skipWiFi, setSkipWiFi] = useState(false);
   const [isCheckingWiFi, setIsCheckingWiFi] = useState(true);
 
-  useEffect(() => {
-  requestBluetoothPermissions();
 
-  const notificationListener = Notifications.addNotificationReceivedListener(notification => {
-    console.log("Notification received in foreground:", notification);
-    Alert.alert(notification.request.content.title, notification.request.content.body);
-  });
-
-  const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-    console.log("User interacted with notification:", response);
-  });
-
-  const checkStoredWiFi = async (uid) => {
-    try {
-      const savedSSID = await AsyncStorage.getItem(`wifi_ssid_${uid}`);
-      if (savedSSID) {
-        setSkipWiFi(true);
+  // useEffect(() => {
+  //   const checkForOTAUpdate = async () => {
+  //     try {
+  //       const update = await Updates.checkForUpdateAsync();
+  //       if (update.isAvailable) {
+  //         console.log("🔄 Update available! Downloading...");
+  //         await Updates.fetchUpdateAsync();
+  //         console.log("✅ Update fetched, reloading...");
+  //         await Updates.reloadAsync();
+  //       } else {
+  //         console.log("✅ App is up to date");
+  //       }
+  //     } catch (e) {
+  //       console.error("❌ Failed to check for updates:", e);
+  //     }
+  //   };
+  
+  //   checkForOTAUpdate();
+  // }, []); 
+  
+  
+  const requestBluetoothPermissions = async () => {
+    if (Platform.OS === 'android' && Platform.Version >= 31) {
+      try {
+        const granted = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        ]);
+        const allGranted = Object.values(granted).every(
+          value => value === PermissionsAndroid.RESULTS.GRANTED
+        );
+        if (!allGranted) {
+          console.warn("Not all Bluetooth permissions granted");
+        }
+      } catch (err) {
+        console.warn("Permission error:", err);
       }
-    } catch (error) {
-      console.error("Error reading saved Wi-Fi:", error);
-    } finally {
-      setIsCheckingWiFi(false);
     }
   };
-
-  const unsubscribe = onAuthStateChanged(auth, (user) => {
-    console.log("User: ", user);
-    setUser(user);
-
-    const db = getDatabase();
-    const userStatusRef = ref(db, "sentrylink/user_in_app");
-    set(userStatusRef, user ? true : false)
-      .then(() => console.log("User in app status updated"))
-      .catch((error) => console.error("Error updating user status:", error));
-
-    if (user) {
-      checkStoredWiFi(user.uid);
-    } else {
-      setIsCheckingWiFi(false);
-    }
-  });
-
-  return () => {
-    unsubscribe();
-    Notifications.removeNotificationSubscription(notificationListener);
-    Notifications.removeNotificationSubscription(responseListener);
-  };
-}, [user]);
+  
+  useEffect(() => {
+    requestBluetoothPermissions();
+  
+    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      console.log("Notification received in foreground:", notification);
+      Alert.alert(notification.request.content.title, notification.request.content.body);
+    });
+  
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log("User interacted with notification:", response);
+    });
+  
+    const checkStoredWiFi = async (uid) => {
+      try {
+        const savedSSID = await AsyncStorage.getItem(`wifi_ssid_${uid}`);
+        if (savedSSID) setSkipWiFi(true);
+      } catch (err) {
+        console.error("❌ WiFi read failed:", err);
+      } finally {
+        setIsCheckingWiFi(false);
+      }
+    };
+  
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      const db = getDatabase();
+      const userStatusRef = ref(db, "sentrylink/user_in_app");
+      set(userStatusRef, !!user)
+        .then(() => console.log("🟢 User status updated"))
+        .catch((e) => console.error("❌ Firebase error:", e));
+  
+      if (user) {
+        checkStoredWiFi(user.uid);
+      } else {
+        setIsCheckingWiFi(false);
+      }
+    });
+  
+    // ✅ Proper cleanup
+    return () => {
+      unsubscribe();
+      Notifications.removeNotificationSubscription(notificationListener);
+      Notifications.removeNotificationSubscription(responseListener);
+    };
+  }, []);
+  
 
   return (
     <NavigationContainer>

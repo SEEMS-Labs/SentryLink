@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "364476906922",
+    "firebase_url": "https://seems-hub-default-rtdb.firebaseio.com",
+    "project_id": "seems-hub",
+    "storage_bucket": "seems-hub.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:364476906922:android:94c5f3c2fb09efe867bfd3",
+        "android_client_info": {
+          "package_name": "com.bedoabzd.MyApp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "364476906922-aai76o2t5g59rkpf9lr1u3b998o9lvb7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bedoabzd.MyApp",
+            "certificate_hash": "6b852632cf051ecc6f293d6acb81fdb35cce39c5"
+          }
+        },
+        {
+          "client_id": "364476906922-l31lsq0vd20mdufldv0dqtmumjfa46kf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUDf4TWYfSDtSU0LgJSiZl-bDiG3Z8sHo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "364476906922-l31lsq0vd20mdufldv0dqtmumjfa46kf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

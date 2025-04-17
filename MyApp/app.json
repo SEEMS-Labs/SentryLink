@@ -6,52 +6,56 @@
     "orientation": "portrait",
     "icon": "./assets/SEEMS_LOGO.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "plugins": [
-      "expo-notifications",
-      [
-        "react-native-ble-plx",
-        {
-          "bluetoothAlwaysPermission": "We use Bluetooth to connect to seems.",
-          "bluetoothPermission": "We use Bluetooth to connect to seems.",
-          "bluetoothAdvertisePermission": "We use Bluetooth to connect to seems."
-        }
-      ]
-    ],
+  "expo-notifications",
+  [
+    "react-native-ble-plx",
+    {
+      "bluetoothAlwaysPermission": "We use Bluetooth to connect to SEEMS.",
+      "bluetoothPermission": "We use Bluetooth to connect to SEEMS.",
+      "bluetoothAdvertisePermission": "We use Bluetooth to connect to SEEMS."
+    }
+  ]
+  
+],
     "ios": {
+      "networkSecurityConfig": "./network_security_config.xml",
       "bundleIdentifier": "com.yourname.appname",
       "supportsTablet": true,
       "buildNumber": "1.0.0",
       "infoPlist": {
-        "UIBackgroundModes": ["fetch", "remote-notification"],
+        "UIBackgroundModes": [
+          "fetch",
+          "remote-notification"
+        ],
         "NSBluetoothAlwaysUsageDescription": "App needs Bluetooth access to connect to devices.",
         "NSBluetoothPeripheralUsageDescription": "App uses Bluetooth to communicate with ESP32."
       }
     },
     "android": {
+      "package": "com.bedoabzd.MyApp",
+      "googleServicesFile": "./google-services.json",
+      "usesCleartextTraffic": true,
+      "networkSecurityConfig": "./network_security_config.xml",
       "permissions": [
-        "NOTIFICATIONS",
+        "INTERNET",
+        "ACCESS_FINE_LOCATION",
         "BLUETOOTH",
         "BLUETOOTH_ADMIN",
         "BLUETOOTH_CONNECT",
-        "ACCESS_FINE_LOCATION",
         "BLUETOOTH_SCAN",
-        "INTERNET"
+        "NOTIFICATIONS"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/SEEMS_LOGO.png",
         "backgroundColor": "#ffffff"
-      },
-      "googleServicesFile": "./google-services.json",
-      "package": "com.bedoabzd.MyApp"
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
+      }
     },
     "notification": {
       "icon": "./assets/Notification-icon.png",
@@ -59,11 +63,19 @@
       "androidMode": "default",
       "androidCollapsedTitle": "Your App Notification"
     },
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/9bcf6511-d71b-4425-b400-e709a03b542d"
+    },
     "extra": {
+      "onesignalAppId":"a607f903-70a7-4a55-b673-728453910623",
       "eas": {
         "projectId": "9bcf6511-d71b-4425-b400-e709a03b542d"
       }
     },
-    "owner": "bedoabzd"
+    "owner": "bedoabzd",
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
   }
 }

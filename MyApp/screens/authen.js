@@ -5,6 +5,7 @@ import { auth } from "../Firebase/firebaseConfig";
 import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+import { registerPushToken } from './NotificationHandler';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState("");
@@ -19,16 +20,19 @@ const LoginScreen = () => {
       setError("");
       await signInWithEmailAndPassword(auth, email, password);
       alert("Logged in successfully!");
-      
-      // Save the login status to AsyncStorage
+  
       await AsyncStorage.setItem('isLoggedIn', 'true');
-      await AsyncStorage.removeItem('pushTokenSent');
+  
+      // 🔔 Register push token right away
+      await registerPushToken();
+  
     } catch (error) {
       setError(error.message);
     } finally {
       setLoading(false);
     }
   };
+  
 
   const handleSignUp = async () => {
     try {

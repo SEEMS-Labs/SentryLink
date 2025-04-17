@@ -1,18 +1,42 @@
 {
   "cli": {
-    "version": ">= 16.2.1",
+    "version": ">= 3.0.0",
     "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "dev",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_RUNTIME_VERSION": "1.0.0"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_RUNTIME_VERSION": "1.0.0"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "channel": "production",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_RUNTIME_VERSION": "1.0.0"
+      }
     }
   },
   "submit": {

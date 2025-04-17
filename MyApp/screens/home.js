@@ -18,13 +18,13 @@ export default function HomeScreen() {
     fetchData();
   }, []);
 
-  const fetchData = () => {
+  const fetchData = async () => {
     const sensorRef = ref(database, "sentry/readings");
-
-    const unsubscribe = onValue(sensorRef, async (snapshot) => {
+  
+    const unsubscribe = onValue(sensorRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-
+  
         const roundedData = {
           airQuality: data.airQuality ? Math.round(Number(data.airQuality)) : 0,
           humidity: data.humidity ? Math.round(Number(data.humidity)) : 0,
@@ -32,7 +32,7 @@ export default function HomeScreen() {
           temperature: data.temperature ? Math.round(Number(data.temperature)) : 0,
           noise: data.noise ? Math.round(Number(data.noise)) : 0,
         };
-
+  
         setSensorData(roundedData);
       } else {
         console.log("No sensor data available");
@@ -62,7 +62,7 @@ export default function HomeScreen() {
         <View style={styles.card}>
           <Ionicons name="thermometer" size={30} color="red" />
           <Text style={styles.cardTitle}>Temperature</Text>
-          <Text style={styles.cardValue}>{(Math.round(sensorData.temperature *5/9+32))}°F</Text>
+          <Text style={styles.cardValue}>{(Math.round(sensorData.temperature *9/5+32))}°F</Text>
         </View>
 
         <View style={styles.card}>
