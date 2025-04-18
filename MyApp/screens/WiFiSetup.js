@@ -1,49 +1,61 @@
 // WiFiSetup.js
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
-  Button,
   FlatList,
   Alert,
   TextInput,
   Modal,
-  StyleSheet
+  StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 import { BleManager } from "react-native-ble-plx";
 import base64 from "react-native-base64";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { database } from "../Firebase/firebaseConfig";
+import { ref, get } from "firebase/database";
 
-const WiFiSetup = ({ navigation, setSkipWiFi }) => {
-  const [isScanning, setIsScanning] = useState(false);
-  const [devices, setDevices] = useState([]);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState(null);
-  const [ssid, setSsid] = useState("");
-  const [password, setPassword] = useState("");
-  const [ssidSent, setSsidSent] = useState(false);
+const SERVICE_UUID        = "ab3b4f86-a60b-439f-98a0-ebb022b74550";
+const CHARACTERISTIC_UUID = "e8f99c04-2c62-4660-bc38-30e488e1fd5d";
+const MAX_ACK_ATTEMPTS    = 30;
+const POLL_INTERVAL_MS    = 2000;
 
-  const [serviceUUID, setServiceUUID] = useState(null);
-  const [ssidCharUUID, setSsidCharUUID] = useState(null);
-  const [passCharUUID, setPassCharUUID] = useState(null);
-  const [statusCharUUID, setStatusCharUUID] = useState(null);
+const COLORS = {
+  background:      "#2c3338",
+  primary:         "#4e9cff",
+  danger:          "#e74c3c",
+  card:            "#3a3f47",
+  text:            "#ffffff",
+  inputBackground: "#ffffff",
+  modalOverlay:    "rgba(0,0,0,0.8)",
+};
 
+export default function WiFiSetup({ setSkipWiFi }) {
+  const [isScanning, setIsScanning]           = useState(false);
+  const [devices, setDevices]                 = useState([]);
+  const [modalVisible, setModalVisible]       = useState(false);
+  const [selectedDevice, setSelectedDevice]   = useState(null);
+  const [ssid, setSsid]                       = useState("");
+  const [password, setPassword]               = useState("");
+  const [ssidSent, setSsidSent]               = useState(false);
+  const [ackAttemptsLeft, setAckAttemptsLeft] = useState(null);
+  const [isConnecting, setIsConnecting]       = useState(false);
+
+  const previousIpRef = useRef(null);
   const manager = new BleManager();
 
   useEffect(() => {
-    return () => {
-      manager.stopDeviceScan();
-    };
+    manager.stopDeviceScan();
   }, []);
 
   const startScanning = () => {
     setIsScanning(true);
     setDevices([]);
-
     manager.startDeviceScan(null, null, (error, device) => {
       if (error) {
-        console.error("Scan error:", error);
         setIsScanning(false);
         return;
       }
@@ -51,7 +63,6 @@ const WiFiSetup = ({ navigation, setSkipWiFi }) => {
         prev.some(d => d.id === device.id) ? prev : [...prev, device]
       );
     });
-
     setTimeout(() => {
       manager.stopDeviceScan();
       setIsScanning(false);
@@ -61,251 +72,327 @@ const WiFiSetup = ({ navigation, setSkipWiFi }) => {
   const connectToDevice = async device => {
     try {
       manager.stopDeviceScan();
-      const isConnected = await device.isConnected();
-      if (!isConnected) {
+      if (!(await device.isConnected())) {
         await device.connect();
       }
       await device.discoverAllServicesAndCharacteristics();
-      await new Promise(r => setTimeout(r, 500));
-
-      const services = await device.services();
-      let sharedServiceUUID = null;
-      let sharedCharUUID = null;
-
-      for (const service of services) {
-        const chars = await device.characteristicsForService(service.uuid);
-        for (const c of chars) {
-          if (
-            c.uuid.toLowerCase() ===
-            "e8f99c04-2c62-4660-bc38-30e488e1fd5d"
-          ) {
-            sharedServiceUUID = service.uuid;
-            sharedCharUUID = c.uuid;
-            break;
-          }
-        }
-        if (sharedServiceUUID) break;
-      }
-
-      if (!sharedServiceUUID || !sharedCharUUID) {
-        Alert.alert("Error", "Could not find the ESP32 BLE characteristic.");
-        return;
-      }
-
-      setServiceUUID(sharedServiceUUID);
-      setSsidCharUUID(sharedCharUUID);
-      setPassCharUUID(sharedCharUUID);
-      setStatusCharUUID(sharedCharUUID);
       setSelectedDevice(device);
+      Alert.alert("✔ Connected", `to ${device.name || device.id}`);
       setModalVisible(true);
-    } catch (error) {
-      console.error("Connection failed:", error);
-      Alert.alert("Connection Error", error.message || "Could not connect.");
+    } catch (e) {
+      Alert.alert("Connection Error", e.message);
     }
   };
 
-  // Wait until ESP32 sends back Header 4 + Ack C with the assigned IP
-  const waitForWifiAck = (timeoutMs = 20000) =>
-    new Promise((resolve, reject) => {
-      let subscription = null;
-
-      subscription = selectedDevice.monitorCharacteristicForService(
-        serviceUUID,
-        statusCharUUID,
-        (error, char) => {
-          if (error) {
-            subscription.remove();
-            return reject(error);
-          }
-          if (!char?.value) return;
-
-          const decoded = base64.decode(char.value);
-          console.log("🔔 BLE Notification:", decoded);
-
-          if (
-            decoded.includes("Header Received: 4") &&
-            decoded.includes("Ack Msg Received: C")
-          ) {
-            const match = decoded.match(/Data Received:\s*([\d.]+)/);
-            const ip = match ? match[1] : null;
-            subscription.remove();
-            resolve(ip || decoded);
-          }
-        }
-      );
-
-      setTimeout(() => {
-        subscription && subscription.remove();
-        reject(new Error("Timed out waiting for ESP32 Wi‑Fi ACK"));
-      }, timeoutMs);
-    });
-
   const sendSSID = async () => {
     try {
-      const payload = `0${ssid}`;
       await selectedDevice.writeCharacteristicWithResponseForService(
-        serviceUUID,
-        ssidCharUUID,
-        base64.encode(payload)
+        SERVICE_UUID,
+        CHARACTERISTIC_UUID,
+        base64.encode(`0${ssid}`)
       );
       setSsidSent(true);
       Alert.alert("Success", "SSID sent.");
-    } catch (error) {
-      console.error("SSID send error:", error);
+    } catch (e) {
       Alert.alert("Error", "Failed to send SSID.");
     }
   };
 
   const sendPassword = async () => {
     try {
-      const payload = `1${password}`;
+      // store previous IP
+      try {
+        const snap = await get(ref(database, "/sentry/camera/ip"));
+        previousIpRef.current = snap.val();
+      } catch {
+        previousIpRef.current = null;
+      }
+
       await selectedDevice.writeCharacteristicWithResponseForService(
-        serviceUUID,
-        passCharUUID,
-        base64.encode(payload)
+        SERVICE_UUID,
+        CHARACTERISTIC_UUID,
+        base64.encode(`1${password}`)
       );
 
-      Alert.alert("Waiting…", "ESP32 is connecting to Wi‑Fi");
-      const assignedIp = await waitForWifiAck();
-      Alert.alert("Wi‑Fi Setup Complete", `Assigned IP: ${assignedIp}`);
+      const totalSecs = (MAX_ACK_ATTEMPTS * POLL_INTERVAL_MS) / 1000;
+      Alert.alert(
+        "Connecting…",
+        `This may take up to ${totalSecs} seconds.`
+      );
 
-      await AsyncStorage.setItem("wifi_ssid", ssid);
-      await AsyncStorage.setItem("wifi_pass", password);
-      setSsid("");
-      setPassword("");
-      setSsidSent(false);
+      await new Promise(res => setTimeout(res, 12000));
+      await selectedDevice.cancelConnection();
+      setModalVisible(false);
 
-      setTimeout(() => {
-        setModalVisible(false);
-      }, 150);
-    } catch (error) {
-      console.error("Password/ACK error:", error);
-      Alert.alert("Error", error.message);
-    }+
-
-    setTimeout(async () => {
-      try {
-        await selectedDevice.cancelConnection();
-        console.log("Disconnected from ESP32");
-      } catch (err) {
-        console.error("Disconnect error:", err);
-      }
-    }, 1000);
-  };
-
-  const skipWiFiSetup = () => {
-    if (typeof setSkipWiFi === "function") {
-      setSkipWiFi(true);
+      setIsConnecting(true);
+      setAckAttemptsLeft(MAX_ACK_ATTEMPTS);
+      setTimeout(() => pollForIp(MAX_ACK_ATTEMPTS), 1000);
+    } catch (e) {
+      Alert.alert("Error", e.message);
     }
   };
 
+  const pollForIp = async attemptsLeft => {
+    setAckAttemptsLeft(attemptsLeft);
+
+    if (attemptsLeft <= 0) {
+      setIsConnecting(false);
+      Alert.alert(
+        "Timeout",
+        "Connection failed. Please try again.",
+        [{ text: "OK", onPress: () => setModalVisible(true) }],
+        { cancelable: false }
+      );
+      setSsidSent(false);
+      setAckAttemptsLeft(null);
+      return;
+    }
+
+    try {
+      const snap = await get(ref(database, "/sentry/camera/ip"));
+      const ip = snap.val();
+      if (ip && ip !== previousIpRef.current) {
+        setIsConnecting(false);
+        Alert.alert("Success", "Connected! Welcome to SEEMS!", [
+          {
+            text: "OK",
+            onPress: async () => {
+              await AsyncStorage.setItem("wifi_ssid", ssid);
+              await AsyncStorage.setItem("wifi_pass", password);
+              setSsid("");
+              setPassword("");
+              setSsidSent(false);
+              setAckAttemptsLeft(null);
+              setSkipWiFi(true);
+            },
+          },
+        ]);
+        return;
+      }
+    } catch {
+      // ignore
+    }
+
+    setTimeout(() => pollForIp(attemptsLeft - 1), POLL_INTERVAL_MS);
+  };
+
+  const skipWiFiSetup = () => setSkipWiFi?.(true);
+
   const renderDevice = ({ item }) => (
-    <View style={{ marginVertical: 4 }}>
-      <Button
-        title={`Connect to ${item.name || item.id}`}
+    <View style={styles.deviceCard}>
+      <TouchableOpacity
+        style={[
+          styles.button,
+          isConnecting && { opacity: 0.6 },
+        ]}
+        disabled={isConnecting}
         onPress={() => connectToDevice(item)}
-      />
+      >
+        <Text style={styles.buttonText}>
+          Connect to {item.name || item.id}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>WiFi Setup Screen</Text>
+      {isConnecting && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={COLORS.text} />
+          <Text style={styles.loadingText}>Connecting…</Text>
+        </View>
+      )}
 
-      <Button
-        title={isScanning ? "Scanning..." : "Start Scanning"}
+      <Text style={styles.header}>WiFi Setup</Text>
+
+      <TouchableOpacity
+        style={[
+          styles.button,
+          (isScanning || isConnecting) && { opacity: 0.6 },
+        ]}
+        disabled={isScanning || isConnecting}
         onPress={startScanning}
-        disabled={isScanning}
-      />
+      >
+        <Text style={styles.buttonText}>
+          {isScanning ? "Scanning…" : "Start Scanning"}
+        </Text>
+      </TouchableOpacity>
 
       <FlatList
         data={devices}
         renderItem={renderDevice}
-        keyExtractor={item => `${item.id}_${item.name}`}
-        style={styles.scanList}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.scanList}
       />
 
-      <View style={{ marginTop: 20 }}>
-        <Button title="Skip WiFi Setup" onPress={skipWiFiSetup} color="red" />
-      </View>
+      <TouchableOpacity
+        style={[
+          styles.button,
+          styles.dangerButton,
+          isConnecting && { opacity: 0.6 },
+        ]}
+        disabled={isConnecting}
+        onPress={skipWiFiSetup}
+      >
+        <Text style={styles.buttonText}>Skip WiFi Setup</Text>
+      </TouchableOpacity>
 
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={{ fontSize: 16, marginBottom: 10 }}>
-              Enter Wi-Fi Credentials
-            </Text>
+            <Text style={styles.modalTitle}>Enter Wi‑Fi Credentials</Text>
+
             <TextInput
-              placeholder="Wi-Fi SSID"
+              placeholder="SSID"
+              placeholderTextColor="#888"
               value={ssid}
               onChangeText={setSsid}
               style={styles.input}
+              editable={!isConnecting}
             />
             <TextInput
-              placeholder="Wi-Fi Password"
+              placeholder="Password"
+              placeholderTextColor="#888"
               value={password}
-              secureTextEntry
               onChangeText={setPassword}
+              secureTextEntry
               style={styles.input}
+              editable={!isConnecting}
             />
-            <Button title="Send SSID" onPress={sendSSID} disabled={!ssid} />
-            <View style={{ marginVertical: 10 }} />
-            <Button
-              title="Send Password"
+
+            <TouchableOpacity
+              style={[
+                styles.button,
+                ( !ssid || isConnecting ) && { opacity: 0.6 },
+              ]}
+              disabled={!ssid || isConnecting}
+              onPress={sendSSID}
+            >
+              <Text style={styles.buttonText}>Send SSID</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.button,
+                ( !ssidSent || !password || isConnecting ) && { opacity: 0.6 },
+              ]}
+              disabled={!ssidSent || !password || isConnecting}
               onPress={sendPassword}
-              disabled={!ssidSent || !password}
-            />
-            <View style={{ marginTop: 10 }}>
-              <Button
-                title="Cancel"
-                onPress={() => {
-                  setModalVisible(false);
-                  setSsidSent(false);
-                }}
-                color="gray"
-              />
-            </View>
+            >
+              <Text style={styles.buttonText}>Send Password</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton, isConnecting && { opacity: 0.6 }]}
+              disabled={isConnecting}
+              onPress={() => {
+                setModalVisible(false);
+                setSsidSent(false);
+                setAckAttemptsLeft(null);
+              }}
+            >
+              <Text style={styles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+
+            {ackAttemptsLeft !== null && !isConnecting && (
+              <View style={styles.checkingContainer}>
+                <ActivityIndicator size="small" color="#000" />
+                <Text>Checking… Attempts left: {ackAttemptsLeft}</Text>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#2c3338",
-    padding: 20
+    flex:            1,
+    backgroundColor: COLORS.background,
+    alignItems:      "center",
+    padding:         20,
   },
   header: {
-    fontSize: 18,
-    marginBottom: 10,
-    color: "#fff"
+    fontSize:     24,
+    color:        COLORS.text,
+    marginBottom: 20,
+    fontWeight:   "bold",
   },
   scanList: {
-    marginTop: 12,
-    width: "90%"
+    marginTop:    12,
+    width:        "100%",
+    alignItems:   "center",
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#000000aa"
+  deviceCard: {
+    backgroundColor: COLORS.card,
+    padding:         12,
+    borderRadius:    8,
+    marginVertical:  4,
+    width:           "90%",
   },
-  modalContent: {
-    backgroundColor: "white",
-    padding: 20,
-    borderRadius: 10,
-    width: "90%"
+  button: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    borderRadius:    8,
+    alignItems:      "center",
+    marginVertical:  6,
+    width:           "100%",
+  },
+  dangerButton: {
+    backgroundColor: COLORS.danger,
+  },
+  cancelButton: {
+    backgroundColor: COLORS.card,
+  },
+  buttonText: {
+    color:      COLORS.text,
+    fontSize:   16,
+    fontWeight: "600",
   },
   input: {
-    borderWidth: 1,
-    marginBottom: 10,
-    padding: 8
-  }
+    backgroundColor: COLORS.inputBackground,
+    borderRadius:    6,
+    borderWidth:     1,
+    borderColor:     "#ccc",
+    padding:         10,
+    marginBottom:    12,
+    width:           "100%",
+  },
+  modalOverlay: {
+    flex:            1,
+    justifyContent:  "center",
+    alignItems:      "center",
+    backgroundColor: COLORS.modalOverlay,
+  },
+  modalContent: {
+    backgroundColor: COLORS.inputBackground,
+    padding:         20,
+    borderRadius:    12,
+    width:           "90%",
+    alignItems:      "center",
+  },
+  modalTitle: {
+    fontSize:     20,
+    marginBottom: 16,
+    fontWeight:   "bold",
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent:  "center",
+    alignItems:      "center",
+    zIndex:          10,
+  },
+  loadingText: {
+    color:      COLORS.text,
+    marginTop:  10,
+    fontSize:   16,
+  },
+  checkingContainer: {
+    marginTop:    20,
+    alignItems:   "center",
+  },
 });
-
-export default WiFiSetup;

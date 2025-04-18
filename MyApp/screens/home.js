@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { database } from "../Firebase/firebaseConfig";
 import { ref, onValue } from "firebase/database";
 import { SafeAreaView, StatusBar } from 'react-native';
+import { registerPushToken, sendPushNotification } from "./NotificationHandler";
 
 export default function HomeScreen() {
   const [sensorData, setSensorData] = useState({
@@ -15,8 +16,9 @@ export default function HomeScreen() {
   });
   const [refreshing, setRefreshing] = useState(false);
   useEffect(() => {
+    registerPushToken();
     fetchData();
-  }, []);
+  }, []);     
 
   const fetchData = async () => {
     const sensorRef = ref(database, "sentry/readings");

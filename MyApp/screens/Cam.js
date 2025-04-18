@@ -1,11 +1,5 @@
 // CamScreen.js
 
-/**
- * Note: To allow local (http) URLs on Android 9+,
- * set android:usesCleartextTraffic="true" in AndroidManifest.xml
- * or use a network_security_config that permits your local IP.
- */
-
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
@@ -17,7 +11,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { database } from "../Firebase/firebaseConfig";
-import { ref, onValue, off, update } from 'firebase/database';
+import { ref, onValue, off, update, set } from 'firebase/database';
 import { Ionicons } from '@expo/vector-icons';
 
 // Parses the 32‑bit controller integer into fields
@@ -106,10 +100,11 @@ const CamScreen = () => {
     return () => off(motorRef);
   }, []);
 
-  // Send one of the four directions
-  const handleDirection = (dir) => {
+  // Handle D-pad press (start)
+  const pressDirection = (dir) => {
     if (!manualControlEnabled || !motorState) return;
     const updated = { ...motorState };
+    updated.controlMode = 1;
     switch (dir) {
       case 'LEFT':  updated.dpadDirection = 0; break;
       case 'RIGHT': updated.dpadDirection = 1; break;
@@ -118,19 +113,22 @@ const CamScreen = () => {
       default: return;
     }
     const raw = reconvertControllerData(updated);
-    update(ref(database, "sentrylink"), { controller: raw })
-      .then(() => console.log(`✅ ${dir} sent`))
-      .catch(err => console.error("❌ update error:", err));
+    set(ref(database, "sentrylink/controller"), raw)
+  .then(() => console.log("✅ D-pad released (stop)"))
+  .catch(err => console.error("❌ release error:", err));
   };
 
-  // **NEW**: reset D-pad to 0
-  const resetDpad = () => {
-    if (!motorState) return;
-    const reset = { ...motorState, dpadDirection: 0 };
-    const raw = reconvertControllerData(reset);
-    update(ref(database, "sentrylink"), { controller: raw })
-      .then(() => console.log("✅ D-pad reset to 0"))
-      .catch(err => console.error("❌ reset error:", err));
+  // Handle D-pad release (stop)
+  const releaseDirection = () => {
+    if (!manualControlEnabled || !motorState) return;
+    const updated = { ...motorState };
+    updated.controlMode = 0;
+    updated.dpadDirection  = 0;   
+    // dpadDirection can remain set or be reset; motors will ignore when controlMode=0
+    const raw = reconvertControllerData(updated);
+    set(ref(database, "sentrylink/controller"), raw)
+    .then(() => console.log("✅ D-pad released (stop)"))
+    .catch(err => console.error("❌ release error:", err));
   };
 
   // FPS/WebView setup unchanged...
@@ -204,12 +202,13 @@ const CamScreen = () => {
           </Text>
         </TouchableOpacity>
 
-        {/* D-pad */}
+        {/* D-pad with press-and-hold */}
         <View style={styles.directionButtonsContainer}>
           <View style={styles.row}>
             <TouchableOpacity
               style={styles.directionButton}
-              onPress={() => handleDirection('UP')}
+              onPressIn={() => pressDirection('UP')}
+              onPressOut={releaseDirection}
             >
               <Ionicons name="arrow-up" size={24} color="white" />
             </TouchableOpacity>
@@ -217,13 +216,15 @@ const CamScreen = () => {
           <View style={styles.row}>
             <TouchableOpacity
               style={styles.directionButton}
-              onPress={() => handleDirection('LEFT')}
+              onPressIn={() => pressDirection('LEFT')}
+              onPressOut={releaseDirection}
             >
               <Ionicons name="arrow-back" size={24} color="white" />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.directionButton}
-              onPress={() => handleDirection('RIGHT')}
+              onPressIn={() => pressDirection('RIGHT')}
+              onPressOut={releaseDirection}
             >
               <Ionicons name="arrow-forward" size={24} color="white" />
             </TouchableOpacity>
@@ -231,7 +232,8 @@ const CamScreen = () => {
           <View style={styles.row}>
             <TouchableOpacity
               style={styles.directionButton}
-              onPress={() => handleDirection('DOWN')}
+              onPressIn={() => pressDirection('DOWN')}
+              onPressOut={releaseDirection}
             >
               <Ionicons name="arrow-down" size={24} color="white" />
             </TouchableOpacity>
@@ -246,14 +248,6 @@ const CamScreen = () => {
           <Text style={styles.buttonText}>
             {manualControlEnabled ? 'Manual Control: ON' : 'Enable Manual Control'}
           </Text>
-        </TouchableOpacity>
-
-        {/* Reset D-pad */}
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: '#E53E3E' }]}
-          onPress={resetDpad}
-        >
-          <Text style={styles.buttonText}>Reset D-pad</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

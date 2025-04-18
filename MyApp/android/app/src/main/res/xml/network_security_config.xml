@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-  <!-- allow cleartext (HTTP) on your LAN -->
+  <!-- allow cleartext on your LAN -->
   <base-config cleartextTrafficPermitted="true" />
+
   <domain-config cleartextTrafficPermitted="true">
-    <!-- adjust subnet if needed -->
-    <domain>192.168.0.0/16</domain>
+    <!-- explicitly include subdomains -->
+    <domain includeSubdomains="true">192.168.0.0/16</domain>
   </domain-config>
 </network-security-config>
